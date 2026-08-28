@@ -14,205 +14,216 @@ const manualChunks = {
   // External libraries that rarely change and can be cached separately
   vendor: ['zod', 'canvas-confetti'],
   
-  // Engine core - handles game loop, rendering, and system orchestration
+  // Engine core - handles game loop, input, entities, scenes
   engine: [
     './src/engine/Engine.ts',
     './src/engine/InputManager.ts',
     './src/engine/EntityManager.ts',
     './src/engine/SceneManager.ts',
-    './src/engine/RenderSystem.ts'
   ],
   
-  // Physics subsystem - vehicle dynamics, collision detection, drift mechanics
+  // Physics systems - vehicle physics, collision, drift mechanics
   physics: [
     './src/physics/PhysicsEngine.ts',
     './src/physics/VehiclePhysics.ts',
     './src/physics/CollisionSystem.ts',
     './src/physics/DriftController.ts',
-    './src/physics/MathUtils.ts'
+    './src/physics/MathUtils.ts',
   ],
   
-  // Entity components - player vehicles, particles, track elements
+  // Game entities - vehicles, tracks, particles, camera
   entities: [
     './src/entities/Entity.ts',
     './src/entities/CardVehicle.ts',
     './src/entities/TrackSegment.ts',
     './src/entities/Particle.ts',
-    './src/entities/Camera.ts'
+    './src/entities/Camera.ts',
   ],
   
-  // Audio subsystem - sound synthesis, music management, SFX effects
+  // Audio systems - sound synthesis and audio control
   audio: [
     './src/audio/AudioSystem.ts',
-    './src/audio/AudioController.ts'
+    './src/audio/AudioController.ts',
   ],
   
-  // Game systems - card deck logic, scoring, power-ups
-  systems: [
-    './src/systems/CardDeck.ts'
-  ]
+  // Render system
+  render: ['./src/engine/RenderSystem.ts'],
 };
 
 export default defineConfig({
-  // Project root directory
-  root: '.',
-  
-  // Public base path for assets
+  // Base path for assets
   base: '/',
   
-  // Output directory for production builds
+  // Root directory
+  root: '.',
+  
+  // Output directory
   outDir: 'dist',
   
-  // Clean dist folder before build
+  // Clean output directory before build
   cleanDist: true,
   
-  // Source map generation settings
+  // Build settings
   build: {
-    sourcemap: true,
+    // Target browsers
+    target: 'ES2022',
     
-    // Target browser compatibility
-    target: 'esnext',
-    
-    // Minification settings with terser
+    // Minification with Terser
     minify: 'terser',
     
-    // Terser compression options for production
+    // Terser options for production optimization
     terserOptions: {
       compress: {
-        drop_console: false,
+        drop_console: false, // Keep console for debugging
         drop_debugger: false,
-        pure_funcs: [],
-        passes: 1,
-        warnings: false,
+        passes: 2,
       },
       mangle: {
-        reserved: [],
-        keep_fnames: true, // Keep function names for debugging
+        safari10: true,
       },
       format: {
         comments: false,
       },
     },
     
-    // Rollup bundle configuration
+    // Generate source maps for debugging
+    sourcemap: true,
+    
+    // Rollup options for code splitting
     rollupOptions: {
+      // Input entry point
       input: {
         main: resolve(__dirname, 'index.html'),
       },
       
+      // Output configuration
       output: {
-        // Chunk naming pattern
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        
         // Asset naming pattern
-        assetFileNames: (chunkInfo) => {
-          const name = chunkInfo.name;
-          if (/\.png$|\.jpg$|\.svg$/.test(name)) {
-            return 'assets/images/[name][extname]';
+        assetFileNames: ({ name }) => {
+          const extType = name?.split('.').at(1);
+          if (/\.(png|jpe?g|gif|svg|webp)$/i.test(String(name))) {
+            return `assets/images/[name]-[hash][extname]`;
           }
-          if (/\.css$/.test(name)) {
-            return 'assets/styles/[name]-[hash][extname]';
+          if (/\.(woff2?|ttf|otf|eot)$/i.test(String(name))) {
+            return `assets/fonts/[name]-[hash][extname]`;
           }
-          return 'assets/[name]-[hash][extname]';
+          if (/\.(mp3|wav|ogg)$/i.test(String(name))) {
+            return `assets/audio/[name]-[hash][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
         },
         
-        // Manual chunking
+        // Chunk naming pattern
+        entryFileNames: 'js/[name]-[hash].js',
+        chunkFileNames: 'js/chunks/[name]-[hash].js',
+        cssFileNames: 'css/[name]-[hash].css',
+        
+        // Manual chunks configuration
         manualChunks,
-        
-        // Inline small assets (under 8KB) as data URIs
-        inlineDynamicImports: true,
-        
-        // Preserve module structure for better debugging
-        preserveEntrySignatures: 'exports-only',
       },
+      
+      // Preserve module structure
+      preserveEntrySignatures: 'exports-only',
     },
     
-    // Build performance optimization
+    // Code size reporting
+    reportCompressedSize: true,
+    
+    // Chunk size warning threshold (in kB)
     chunkSizeWarningLimit: 500,
     
     // CSS code splitting
     cssCodeSplit: true,
+    
+    // Empty outDir before build
+    emptyOutDir: true,
   },
   
   // Development server configuration
   server: {
-    // Host binding for network access
+    // Host binding (accessible from network)
     host: '0.0.0.0',
     
-    // Port configuration
+    // Development server port
     port: 3000,
     
-    // Auto-open browser on startup
+    // Open browser automatically
     open: true,
     
-    // Hot Module Replacement (HMR) settings
-    hmr: {
-      enabled: true,
-      timeout: 30000,
-      overlay: true,
-      clientPort: 3000,
-      path: '/__hmr',
-    },
+    // Force HTTPS in development
+    https: false,
     
-    // Proxy configuration for API calls
+    // Proxy configuration for API requests
     proxy: {},
     
     // File watching options
     watch: {
       usePolling: false,
       interval: 100,
-      ignore: ['node_modules/**', 'dist/**'],
+      ignored: ['**/node_modules/**', '**/dist/**'],
     },
     
-    // Strict port usage
-    strictPort: true,
-    
-    // CORS headers
-    cors: true,
-    
-    // Allowed origins
-    allowedHosts: ['localhost', '127.0.0.1'],
+    // Server headers
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+    },
   },
   
-  // Resolve alias configuration
+  // Optimization settings
+  optimizeDeps: {
+    // Include dependencies to pre-bundle
+    include: ['zod', 'canvas-confetti'],
+    
+    // Exclude large dependencies
+    exclude: [],
+    
+    // Force re-bundle on deps change
+    force: false,
+  },
+  
+  // Preload settings
+  preload: {
+    // Enable preloading
+    enabled: true,
+    
+    // Preload strategies
+    crossOrigin: 'anonymous',
+  },
+  
+  // CSS processing
+  css: {
+    // CSS modules configuration
+    modules: {
+      localsConvention: 'camelCaseOnly',
+      generateScopedName: '[name]-[local]-[hash:base64:8]',
+    },
+    
+    // PostCSS plugins
+    postcss: {
+      plugins: [],
+    },
+  },
+  
+  // Define global constants
+  define: {
+    // Application version
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0.0'),
+    
+    // Environment detection
+    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
+    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV === 'development'),
+  },
+  
+  // Resolve aliases
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      '#types': resolve(__dirname, 'src/types'),
-      '#utils': resolve(__dirname, 'src/utils'),
-      '#entities': resolve(__dirname, 'src/entities'),
-      '#engine': resolve(__dirname, 'src/engine'),
-      '#physics': resolve(__dirname, 'src/physics'),
-      '#audio': resolve(__dirname, 'src/audio'),
-      '#systems': resolve(__dirname, 'src/systems'),
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
-  // Optimize dependencies pre-bundling
-  optimizeDeps: {
-    include: ['zod', 'canvas-confetti'],
-    exclude: [],
-    force: false,
-  },
-  
-  // CSS processing configuration
-  css: {
-    modules: {
-      localsConvention: 'camelCaseOnly',
-      scopeBehavior: 'local',
-    },
-    preprocessorOptions: {},
-  },
-  
-  // Define global constants for environment detection
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV !== 'production'),
-    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
-  },
-  
-  // Plugins extension point
+  // Plugin configuration space (for future plugins)
   plugins: [],
 });
