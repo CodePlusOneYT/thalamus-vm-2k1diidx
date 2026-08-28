@@ -57,7 +57,34 @@ export default defineConfig({
   
   // Build settings
   build: {
-    // Rollup options
+    // Target browsers
+    target: 'ES2022',
+    
+    // Minification with Terser
+    minify: 'terser',
+    
+    // Terser options for production optimization
+    terserOptions: {
+      compress: {
+        drop_console: false, // Keep console for debugging
+        drop_debugger: false,
+        passes: 2,
+      },
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
+    
+    // Sourcemap generation for both dev and build
+    sourcemap: true,
+    
+    // Code splitting threshold
+    chunkSizeWarningLimit: 500,
+    
+    // Rollup rollupOptions for chunking
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
@@ -77,41 +104,8 @@ export default defineConfig({
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-      },
-    },
-    
-    // Target browsers
-    target: 'ES2022',
-    
-    // Minification with Terser
-    minify: 'terser',
-    
-    // Terser options for production optimization
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug'],
-        passes: 2,
-      },
-      mangle: {
-        safari10: true,
-      },
-      format: {
-        comments: false,
-      },
-    },
-    
-    // Sourcemap generation for production
-    sourcemap: true,
-    
-    // Code splitting threshold
-    chunkSizeWarningLimit: 500,
-    
-    // Rollup compression options
-    rollupOptions: {
-      output: {
-        manualChunks,
+        
+        // Inline dynamic imports for better performance
         inlineDynamicImports: true,
       },
     },
@@ -123,43 +117,40 @@ export default defineConfig({
     port: 3000,
     strictPort: false,
     open: false,
+    cors: true,
     hmr: {
-      protocol: 'ws',
       host: 'localhost',
-      port: 3000,
+      protocol: 'ws',
       clientPort: 3000,
     },
     watch: {
       usePolling: false,
-      interval: 100,
     },
   },
   
-  // Source map configuration
+  // CSS preprocessor settings
   css: {
-    devSourcemap: true,
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use "@/styles/variables.scss" as *;`,
+      },
+    },
   },
   
-  // Resolve aliases for cleaner imports
+  // Resolve aliases
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
-      '@engine': resolve(__dirname, './src/engine'),
-      '@physics': resolve(__dirname, './src/physics'),
-      '@entities': resolve(__dirname, './src/entities'),
-      '@audio': resolve(__dirname, './src/audio'),
-      '@systems': resolve(__dirname, './src/systems'),
+      '@': resolve(__dirname, 'src'),
     },
   },
   
-  // Optimizer settings
+  // Optimizations
   optimizeDeps: {
     include: ['zod', 'canvas-confetti'],
-    exclude: [],
-    force: false,
+    exclude: ['@types/dom'],
   },
   
-  // Define global constants
+  // Define environment variables
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
     __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
