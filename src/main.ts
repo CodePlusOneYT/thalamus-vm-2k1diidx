@@ -1,3 +1,7 @@
+/**
+ * Main Game Entry Point
+ * Initializes all game systems and starts the game loop
+ */
 import { Engine } from './engine/Engine.js';
 import { InputManager } from './engine/InputManager.js';
 import { EntityManager } from './engine/EntityManager.js';
@@ -40,299 +44,461 @@ class CardDriveDrift {
   private startScreen: HTMLElement | null = null;
   private gameOverScreen: HTMLElement | null = null;
 
-  constructor() {
-    this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
-    this.ctx = this.canvas.getContext('2d')!;
+  constructor(canvasId: string) {
+    this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+    if (!this.canvas) {
+      throw new Error(`Canvas element with id "${canvasId}" not found`);
+    }
     
+    // Set canvas dimensions
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
+    
+    this.ctx = this.canvas.getContext('2d')!;
+    if (!this.ctx) {
+      throw new Error('Failed to get 2D context');
+    }
+
     // Initialize systems
+    this.engine = new Engine(this.canvas);
     this.input = new InputManager();
+    this.entityMgr = new EntityManager();
+    this.sceneMgr = new SceneManager();
+    this.renderer = new RenderSystem(this.ctx, this.canvas);
     this.audio = new AudioSystem();
     this.physics = new PhysicsEngine();
-    this.renderer = new RenderSystem(this.canvas, this.ctx);
-    this.entityMgr = new EntityManager();
-    this.sceneMgr = new SceneManager(this.entityMgr);
-    this.engine = new Engine(this.input, this.physics, this.renderer, this.entityMgr, this.sceneMgr);
-    
-    // Bind methods
-    this.init = this.init.bind(this);
-    this.gameLoop = this.gameLoop.bind(this);
-    this.handleResize = this.handleResize.bind(this);
-    this.handleStart = this.handleStart.bind(this);
-    this.handleRestart = this.handleRestart.bind(this);
-    this.handleTouch = this.handleTouch.bind(this);
-    
+
     // Setup event listeners
-    window.addEventListener('resize', this.handleResize);
-    document.addEventListener('keydown', this.input.onKeyDown.bind(this.input));
-    document.addEventListener('keyup', this.input.onKeyUp.bind(this.input));
-    this.canvas.addEventListener('mousedown', this.handleTouch);
-    this.canvas.addEventListener('touchstart', this.handleTouch);
+    this.setupEventListeners();
     
-    // UI Elements
-    this.uiOverlay = document.getElementById('uiOverlay');
-    this.startScreen = document.getElementById('startScreen');
-    this.gameOverScreen = document.getElementById('gameOverScreen');
+    // Create UI overlay
+    this.createUIOverlay();
     
-    // Initial resize
-    this.handleResize();
-    
-    // Store reference for debugging
-    (window as any).__cardDriveDrift = this;
-    
-    console.log('[CardDriveDrift] Initialized successfully');
+    // Start game
+    this.startGame();
   }
 
-  init(): void {
-    // Create initial entities
-    this.createPlayer();
-    this.generateTrack(50);
-    this.createParticles(10);
+  private setupEventListeners(): void {
+    window.addEventListener('resize', () => this.handleResize());
+    document.addEventListener('keydown', (e: KeyboardEvent) => this.handleKeyDown(e));
+    document.addEventListener('keyup', (e: KeyboardEvent) => this.handleKeyUp(e));
     
-    // Start engine
-    this.engine.start();
+    // Touch support for mobile
+    this.canvas.addEventListener('touchstart', (e: TouchEvent) => this.handleTouchStart(e), { passive: false });
+    this.canvas.addEventListener('touchmove', (e: TouchEvent) => this.handleTouchMove(e), { passive: false });
+    this.canvas.addEventListener('touchend', (e: TouchEvent) => this.handleTouchEnd(e), { passive: false });
+  }
+
+  private handleResize(): void {
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
+    this.renderer.setCanvasSize(rect.width, rect.height);
+  }
+
+  private createUIOverlay(): void {
+    // Check if UI already exists
+    const existingUI = document.querySelector('.game-ui-overlay');
+    if (existingUI) return;
+
+    // Create container
+    this.uiOverlay = document.createElement('div');
+    this.uiOverlay.className = 'game-ui-overlay';
+    this.uiOverlay.innerHTML = `
+      <div class="hud">
+        <div class="hud-item">
+          <span class="label">Score</span>
+          <span class="value" id="score-display">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Distance</span>
+          <span class="value" id="distance-display">0m</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Speed</span>
+          <span class="value" id="speed-display">0 km/h</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Drift</span>
+          <span class="value" id="drift-display">0x</span>
+        </div>
+      </div>
+      
+      <div class="overlay-screen start-screen" id="start-screen">
+        <h1>Card Drive & Drift</h1>
+        <p class="subtitle">Advanced Physics Racing Experience</p>
+        <div class="controls-info">
+          <div><strong>WASD / Arrows</strong> - Drive</div>
+          <div><strong>Space</strong> - Brake</div>
+          <div><strong>Shift</strong> - Handbrake / Drift</div>
+        </div>
+        <button class="btn btn-primary" id="start-btn">Start Game</button>
+      </div>
+      
+      <div class="overlay-screen game-over-screen hidden" id="game-over-screen">
+        <h2>Game Over</h2>
+        <div class="stats">
+          <div class="stat"><span class="label">Final Score:</span> <span class="value" id="final-score">0</span></div>
+          <div class="stat"><span class="label">Total Distance:</span> <span class="value" id="final-distance">0m</span></div>
+          <div class="stat"><span class="label">Max Speed:</span> <span class="value" id="max-speed">0 km/h</span></div>
+        </div>
+        <button class="btn btn-primary" id="restart-btn">Play Again</button>
+      </div>
+    `;
+
+    document.body.appendChild(this.uiOverlay);
+
+    // Bind buttons
+    const startBtn = this.uiOverlay.querySelector('#start-btn') as HTMLButtonElement;
+    const restartBtn = this.uiOverlay.querySelector('#restart-btn') as HTMLButtonElement;
+    
+    if (startBtn) {
+      startBtn.addEventListener('click', () => this.startGame());
+    }
+    if (restartBtn) {
+      restartBtn.addEventListener('click', () => this.restartGame());
+    }
+
+    this.startScreen = this.uiOverlay.querySelector('.start-screen') as HTMLElement;
+    this.gameOverScreen = this.uiOverlay.querySelector('.game-over-screen') as HTMLElement;
+  }
+
+  private updateHUD(): void {
+    const scoreDisplay = this.uiOverlay?.querySelector('#score-display');
+    const distanceDisplay = this.uiOverlay?.querySelector('#distance-display');
+    const speedDisplay = this.uiOverlay?.querySelector('#speed-display');
+    const driftDisplay = this.uiOverlay?.querySelector('#drift-display');
+
+    if (scoreDisplay) scoreDisplay.textContent = Math.floor(this.score).toString();
+    if (distanceDisplay) distanceDisplay.textContent = `${Math.floor(this.distance)}m`;
+    if (speedDisplay && this.vehicle) {
+      const speedKmh = Math.round(this.vehicle.velocity.x * 3.6);
+      speedDisplay.textContent = `${speedKmh} km/h`;
+    }
+    if (driftDisplay && this.vehicle) {
+      driftDisplay.textContent = `${this.vehicle.driftMultiplier.toFixed(1)}x`;
+    }
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    this.input.handleKeyDown(e);
+    
+    // Prevent default for game keys
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift'].includes(e.key)) {
+      e.preventDefault();
+    }
+  }
+
+  private handleKeyUp(e: KeyboardEvent): void {
+    this.input.handleKeyUp(e);
+  }
+
+  private handleTouchStart(e: TouchEvent): void {
+    e.preventDefault();
+    if (!this.gameStarted) return;
+    
+    const touch = e.touches[0];
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const x = touch.clientX - canvasRect.left;
+    const y = touch.clientY - canvasRect.top;
+    
+    // Simple touch controls: left side = brake, right side = accelerate
+    if (x < canvasRect.width / 2) {
+      this.input.pressKey('ArrowLeft');
+    } else {
+      this.input.pressKey('ArrowRight');
+    }
+  }
+
+  private handleTouchMove(e: TouchEvent): void {
+    e.preventDefault();
+  }
+
+  private handleTouchEnd(e: TouchEvent): void {
+    e.preventDefault();
+    this.input.releaseAllKeys();
+  }
+
+  private startGame(): void {
+    if (this.gameStarted) return;
+    
     this.gameStarted = true;
-    this.lastTime = performance.now();
+    this.gameOver = false;
+    this.score = 0;
+    this.distance = 0;
+    this.timeElapsed = 0;
     
+    // Hide start screen
     if (this.startScreen) {
-      this.startScreen.style.display = 'none';
+      this.startScreen.classList.add('hidden');
     }
     
-    console.log('[CardDriveDrift] Game initialized');
+    // Resume audio context on user gesture
+    this.audio.resume();
+    
+    // Initialize level
+    this.initLevel();
+    
+    // Start game loop
+    this.lastTime = performance.now();
+    this.animationId = requestAnimationFrame((time) => this.gameLoop(time));
   }
 
-  createPlayer(): void {
-    const player = new CardVehicle(100, 300, {
-      width: 60,
-      height: 40,
-      color: '#ff6b6b',
-      maxSpeed: 800,
-      acceleration: 400,
-      friction: 0.95,
-      driftFactor: 0.85
-    });
+  private initLevel(): void {
+    // Clear existing entities
+    this.entityMgr.clear();
     
-    player.setPosition(100, 300);
-    this.entityMgr.addEntity(player);
-    this.vehicle = player;
-  }
-
-  generateTrack(segmentCount: number): void {
-    let x = 0;
-    let y = 300;
+    // Create player vehicle
+    const startX = 100;
+    const startY = 400;
     
-    for (let i = 0; i < segmentCount; i++) {
-      const width = 200 + Math.random() * 300;
-      const height = 40 + Math.random() * 60;
+    this.vehicle = new CardVehicle(startX, startY);
+    this.vehicle.name = 'player';
+    this.entityMgr.add(this.vehicle);
+    
+    // Generate track segments
+    const segmentWidth = 200;
+    const numSegments = 50;
+    
+    let currentX = 0;
+    let currentY = 400;
+    let slope = 0;
+    
+    for (let i = 0; i < numSegments; i++) {
+      // Add variety to track
+      const variation = Math.sin(i * 0.5) * 50 + Math.cos(i * 0.3) * 30;
+      const difficulty = Math.min(i / numSegments, 1);
       
-      const segment = new TrackSegment(x, y, width, height);
-      this.entityMgr.addEntity(segment);
+      currentY += slope + variation;
+      currentY = Math.max(200, Math.min(600, currentY));
       
-      // Random gap between segments
-      const gap = 50 + Math.random() * 100;
-      x += width + gap;
+      const segment = new TrackSegment(currentX, currentY);
+      segment.name = `segment-${i}`;
+      segment.difficulty = difficulty;
+      this.entityMgr.add(segment);
       
-      // Random height variation
-      y += (Math.random() - 0.5) * 200;
-      y = Math.max(100, Math.min(window.innerHeight - 150, y));
+      // Add obstacles based on difficulty
+      if (difficulty > 0.3 && Math.random() > 0.7) {
+        const obstacleType = Math.random() > 0.5 ? 'barrier' : 'spike';
+        const obstacleHeight = obstacleType === 'barrier' ? 80 : 40;
+        const obstacleX = currentX + segmentWidth / 2;
+        const obstacleY = currentY - obstacleHeight;
+        
+        const obstacle = new Entity(obstacleX, obstacleY);
+        obstacle.name = `obstacle-${i}`;
+        obstacle.type = obstacleType;
+        obstacle.width = obstacleType === 'barrier' ? 60 : 30;
+        obstacle.height = obstacleHeight;
+        obstacle.color = obstacleType === 'barrier' ? '#ff6b6b' : '#ffd93d';
+        this.entityMgr.add(obstacle);
+      }
+      
+      // Add coins based on difficulty
+      if (difficulty > 0.2 && Math.random() > 0.6) {
+        const coin = new Particle(currentX + segmentWidth / 2, currentY - 60);
+        coin.name = `coin-${i}`;
+        coin.type = 'coin';
+        coin.width = 20;
+        coin.height = 20;
+        this.entityMgr.add(coin);
+      }
+      
+      currentX += segmentWidth;
+      slope = (Math.random() - 0.5) * 0.1;
     }
     
-    // Add finish line
-    const finishLine = new TrackSegment(x, y - 100, 400, 100, { color: '#4ecdc4' });
-    finishLine.isFinishLine = true;
-    this.entityMgr.addEntity(finishLine);
+    // Create camera
+    this.camera = new Camera(0, 0);
   }
 
-  createParticles(count: number): void {
-    for (let i = 0; i < count; i++) {
-      const particle = new Particle(
-        Math.random() * window.innerWidth,
-        Math.random() * window.innerHeight,
-        {
-          size: 2 + Math.random() * 3,
-          speedX: (Math.random() - 0.5) * 2,
-          speedY: (Math.random() - 0.5) * 2,
-          color: `hsla(${Math.random() * 360}, 70%, 60%, ${0.3 + Math.random() * 0.4})`,
-          life: 100 + Math.random() * 100
-        }
-      );
-      this.entityMgr.addEntity(particle);
-    }
-  }
-
-  gameLoop(currentTime: number): void {
+  private gameLoop(timestamp: number): void {
     if (!this.gameStarted || this.gameOver) return;
     
-    const deltaTime = (currentTime - this.lastTime) / 1000;
-    this.lastTime = currentTime;
+    const deltaTime = (timestamp - this.lastTime) / 1000;
+    this.lastTime = timestamp;
+    
+    // Cap delta time to prevent huge jumps
+    const cappedDelta = Math.min(deltaTime, 0.1);
     
     // Update game state
-    this.timeElapsed += deltaTime;
+    this.update(cappedDelta);
     
-    // Update entities
-    this.engine.update(deltaTime);
-    
-    // Check win condition
-    if (this.vehicle && this.vehicle.position.x > 8000) {
-      this.endGame(true);
-    }
-    
-    // Check lose condition (fell off track)
-    if (this.vehicle && this.vehicle.position.y > window.innerHeight + 200) {
-      this.endGame(false);
-    }
-    
-    // Update score based on distance
-    if (this.vehicle) {
-      const currentDistance = this.vehicle.position.x;
-      this.distance = currentDistance;
-      this.score = Math.floor(currentDistance / 100);
-      
-      // Update UI
-      this.updateUI();
-    }
-    
-    // Render frame
-    this.renderer.render(this.timeElapsed, this.input);
+    // Render
+    this.render();
     
     // Continue loop
     this.animationId = requestAnimationFrame((time) => this.gameLoop(time));
   }
 
-  updateUI(): void {
-    if (!this.uiOverlay) return;
+  private update(deltaTime: number): void {
+    if (!this.vehicle) return;
     
-    const scoreEl = this.uiOverlay.querySelector('.score') as HTMLElement;
-    const distanceEl = this.uiOverlay.querySelector('.distance') as HTMLElement;
-    const timeEl = this.uiOverlay.querySelector('.time') as HTMLElement;
+    // Update vehicle physics
+    this.physics.updateVehicle(this.vehicle, this.input, deltaTime);
     
-    if (scoreEl) scoreEl.textContent = `Score: ${this.score}`;
-    if (distanceEl) distanceEl.textContent = `${Math.floor(this.distance)}m`;
-    if (timeEl) timeEl.textContent = `${this.timeElapsed.toFixed(1)}s`;
+    // Apply gravity
+    this.physics.applyGravity(this.vehicle, deltaTime);
+    
+    // Update position
+    this.vehicle.position.add(this.vehicle.velocity.mul(deltaTime));
+    
+    // Update collision detection
+    this.physics.checkCollisions(this.vehicle, this.entityMgr.getAll());
+    
+    // Update camera
+    if (this.camera) {
+      this.camera.follow(this.vehicle, this.canvas.width, this.canvas.height);
+    }
+    
+    // Update particles
+    this.entityMgr.updateParticles(deltaTime);
+    
+    // Calculate score and distance
+    this.distance += Math.abs(this.vehicle.velocity.x) * deltaTime;
+    this.score += Math.abs(this.vehicle.velocity.x) * deltaTime * 0.1;
+    
+    // Add drift bonus
+    if (this.vehicle.isDrifting) {
+      this.score += 5 * deltaTime;
+    }
+    
+    // Update HUD
+    this.updateHUD();
+    
+    // Check for game over conditions
+    this.checkGameOver();
   }
 
-  endGame(victory: boolean): void {
+  private render(): void {
+    // Clear canvas
+    this.ctx.fillStyle = '#1a1a2e';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Apply camera transform
+    this.ctx.save();
+    if (this.camera) {
+      this.ctx.translate(-this.camera.x, -this.camera.y);
+    }
+    
+    // Draw background parallax
+    this.drawBackground();
+    
+    // Draw entities
+    for (const entity of this.entityMgr.getAll()) {
+      if (entity instanceof TrackSegment) {
+        this.renderer.drawTrackSegment(entity);
+      } else if (entity instanceof CardVehicle) {
+        this.renderer.drawCardVehicle(entity);
+      } else if (entity instanceof Particle) {
+        this.renderer.drawParticle(entity);
+      } else {
+        this.renderer.drawEntity(entity);
+      }
+    }
+    
+    this.ctx.restore();
+    
+    // Draw VFX
+    this.drawVFX();
+  }
+
+  private drawBackground(): void {
+    // Simple parallax stars
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (let i = 0; i < 50; i++) {
+      const x = ((i * 137) % this.canvas.width + this.camera?.x || 0) % this.canvas.width;
+      const y = (i * 241) % this.canvas.height;
+      const size = (i % 3) + 1;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, size, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+  }
+
+  private drawVFX(): void {
+    // Screen shake on impact
+    if (this.vehicle?.impactVelocity && this.vehicle.impactVelocity > 5) {
+      const shakeAmount = Math.min(this.vehicle.impactVelocity * 0.5, 20);
+      const shakeX = (Math.random() - 0.5) * shakeAmount;
+      const shakeY = (Math.random() - 0.5) * shakeAmount;
+      this.ctx.translate(shakeX, shakeY);
+    }
+    
+    // Draw particle effects
+    for (const entity of this.entityMgr.getAll()) {
+      if (entity instanceof Particle && entity.active) {
+        this.renderer.drawParticle(entity);
+      }
+    }
+  }
+
+  private checkGameOver(): void {
+    if (!this.vehicle) return;
+    
+    // Check if vehicle fell off track
+    if (this.vehicle.position.y > 800 || this.vehicle.position.y < -200) {
+      this.endGame();
+      return;
+    }
+    
+    // Check collision damage
+    if (this.vehicle.health <= 0) {
+      this.endGame();
+      return;
+    }
+  }
+
+  private endGame(): void {
     this.gameOver = true;
     this.gameStarted = false;
     
-    if (this.animationId !== null) {
+    if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
     
+    // Show game over screen
     if (this.gameOverScreen) {
-      const resultEl = this.gameOverScreen.querySelector('.result') as HTMLElement;
-      const finalScoreEl = this.gameOverScreen.querySelector('.final-score') as HTMLElement;
-      const restartBtn = this.gameOverScreen.querySelector('.restart-btn') as HTMLElement;
+      this.gameOverScreen.classList.remove('hidden');
       
-      if (resultEl) {
-        resultEl.textContent = victory ? '🏆 VICTORY!' : '💥 GAME OVER';
-        resultEl.className = `result ${victory ? 'victory' : 'defeat'}`;
+      const finalScore = this.uiOverlay?.querySelector('#final-score');
+      const finalDistance = this.uiOverlay?.querySelector('#final-distance');
+      const maxSpeed = this.uiOverlay?.querySelector('#max-speed');
+      
+      if (finalScore) finalScore.textContent = Math.floor(this.score).toString();
+      if (finalDistance) finalDistance.textContent = `${Math.floor(this.distance)}m`;
+      if (maxSpeed && this.vehicle) {
+        const maxSpeedKmh = Math.round(Math.max(...Array.from({length: 100}, (_, i) => 
+          this.vehicle!.velocity.x * 3.6 * (i / 100)
+        )) * 3.6);
+        maxSpeed.textContent = `${maxSpeedKmh} km/h`;
       }
-      
-      if (finalScoreEl) {
-        finalScoreEl.textContent = `Final Score: ${this.score}`;
-      }
-      
-      if (restartBtn) {
-        restartBtn.onclick = this.handleRestart;
-        restartBtn.style.display = 'block';
-      }
-      
-      this.gameOverScreen.style.display = 'flex';
     }
     
-    if (victory) {
-      this.audio.playWinSound();
-    } else {
-      this.audio.playLoseSound();
-    }
+    // Play game over sound
+    this.audio.playGameOver();
   }
 
-  handleStart(): void {
-    if (this.startScreen) {
-      this.startScreen.style.display = 'none';
-    }
-    this.init();
+  private restartGame(): void {
+    this.startGame();
   }
 
-  handleRestart(): void {
-    // Reset game state
-    this.score = 0;
-    this.distance = 0;
-    this.timeElapsed = 0;
-    this.gameOver = false;
-    this.gameStarted = false;
-    
-    // Clear entities
-    this.entityMgr.clearEntities();
-    
-    // Reinitialize
-    this.createPlayer();
-    this.generateTrack(50);
-    this.createParticles(10);
-    
-    // Hide game over screen
-    if (this.gameOverScreen) {
-      this.gameOverScreen.style.display = 'none';
-    }
-    
-    // Restart
-    this.lastTime = performance.now();
-    this.engine.start();
-    this.gameLoop(performance.now());
-  }
-
-  handleTouch(e: MouseEvent | TouchEvent): void {
-    if (!this.gameStarted || !this.vehicle) return;
-    
-    // Prevent default touch behavior
-    if (e instanceof TouchEvent) {
-      e.preventDefault();
-    }
-    
-    // Apply boost on click/tap
-    this.vehicle.applyBoost();
-    this.audio.playBoostSound();
-  }
-
-  handleResize(): void {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.renderer.setSize(this.canvas.width, this.canvas.height);
-  }
-
-  destroy(): void {
-    if (this.animationId !== null) {
+  public destroy(): void {
+    if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
-    this.engine.stop();
-    window.removeEventListener('resize', this.handleResize);
-    document.removeEventListener('keydown', this.input.onKeyDown.bind(this.input));
-    document.removeEventListener('keyup', this.input.onKeyUp.bind(this.input));
-    this.canvas.removeEventListener('mousedown', this.handleTouch);
-    this.canvas.removeEventListener('touchstart', this.handleTouch);
-    
-    console.log('[CardDriveDrift] Destroyed');
+    this.entityMgr.clear();
+    this.input.destroy();
   }
 }
 
-// Initialize game when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  const game = new CardDriveDrift();
-  
-  // Start button handler
-  const startBtn = document.getElementById('startBtn');
-  if (startBtn) {
-    startBtn.addEventListener('click', () => game.handleStart());
-  }
-  
-  // Touch handler for mobile
-  const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
-  if (canvas) {
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      game.handleTouch(e);
-    }, { passive: false });
-  }
-});
-
+// Export for global access
 export { CardDriveDrift };
+
+// Initialize when DOM is ready
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const game = new CardDriveDrift('game-canvas');
+    (window as any).__cardDriveDrift = game;
+  });
+}
