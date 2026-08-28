@@ -41,5 +41,19 @@
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.2"
+  },
+  "keywords": [
+    "game",
+    "racing",
+    "physics",
+    "drift",
+    "html5",
+    "canvas"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
   }
 }
