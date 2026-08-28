@@ -67,104 +67,101 @@ export default defineConfig({
         manualChunks,
         
         // Asset handling
-        assetFileName: () => '[name]-[hash][extname]',
+        assetFileNames: ({ name }) => {
+          if (name?.endsWith('.svg')) return 'assets/favicon/[name]-[hash].[ext]';
+          if (name?.endsWith('.png')) return 'assets/icons/[name]-[hash].[ext]';
+          return 'assets/[name]-[hash].[ext]';
+        },
         
-        // Chunk naming
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        
-        // Entry point naming
-        entryFileNames: 'entry-[name]-[hash].js',
-        
-        // Inline chunk size threshold
-        inlineDynamicImports: false,
+        // JS chunks
+        entryFileNames: 'js/[name]-[hash].js',
+        chunkFileNames: 'js/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     
-    // Minification settings
+    // Target browsers
+    target: 'ES2022',
+    
+    // Minification with Terser
     minify: 'terser',
+    
+    // Terser options for production optimization
     terserOptions: {
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: [],
+        pure_funcs: ['console.log', 'console.debug'],
+        passes: 2,
       },
-      mangle: true,
+      mangle: {
+        safari10: true,
+      },
       format: {
         comments: false,
       },
     },
     
-    // Source map generation
+    // Sourcemap generation for production
     sourcemap: true,
     
-    // Target browser compatibility
-    target: 'ES2022',
+    // Code splitting threshold
+    chunkSizeWarningLimit: 500,
     
-    // Assets inlining
-    assetsInlineLimit: 4096,
+    // Rollup compression options
+    rollupOptions: {
+      output: {
+        manualChunks,
+        inlineDynamicImports: true,
+      },
+    },
   },
   
-  // Development server settings
+  // Development server configuration
   server: {
-    // Port configuration
-    port: 3000,
-    
-    // Host binding (allows external access)
     host: '0.0.0.0',
-    
-    // Enable hot module replacement
+    port: 3000,
+    strictPort: false,
+    open: false,
     hmr: {
-      enabled: true,
-      overlay: true,
+      protocol: 'ws',
+      host: 'localhost',
+      port: 3000,
+      clientPort: 3000,
     },
-    
-    // Watch changes
     watch: {
       usePolling: false,
       interval: 100,
     },
-    
-    // CORS headers
-    cors: true,
-    
-    // Strict port usage
-    strictPort: false,
   },
   
-  // CSS settings
+  // Source map configuration
   css: {
-    // Preprocessor options
-    preprocessorOptions: {},
-    
-    // Dynamic imports
-    dynamicImportVars: {
-      warnOnError: true,
-      exclude: [],
-    },
+    devSourcemap: true,
   },
   
-  // Resolve aliases
+  // Resolve aliases for cleaner imports
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(__dirname, './src'),
+      '@engine': resolve(__dirname, './src/engine'),
+      '@physics': resolve(__dirname, './src/physics'),
+      '@entities': resolve(__dirname, './src/entities'),
+      '@audio': resolve(__dirname, './src/audio'),
+      '@systems': resolve(__dirname, './src/systems'),
     },
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
-  // Define environment variables
-  define: {
-    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV === 'development'),
-    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
-    'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV || 'development'),
-  },
-  
-  // Optimizations
+  // Optimizer settings
   optimizeDeps: {
     include: ['zod', 'canvas-confetti'],
     exclude: [],
     force: false,
   },
   
-  // Log level
-  logLevel: 'info',
+  // Define global constants
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+  },
 });
