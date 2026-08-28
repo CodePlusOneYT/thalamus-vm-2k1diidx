@@ -1,9 +1,17 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
+// ============================================================================
+// CARD DRIVE & DRIFT - VITE BUILD CONFIGURATION
+// ============================================================================
+// Production-optimized bundler settings with manual chunking strategy
+// Separates vendor dependencies from game modules for optimal caching and
+// progressive loading in the racing game application
+// ============================================================================
+
 // Manual chunking strategy: separate vendor dependencies from game modules
 const manualChunks = {
-  // External libraries that rarely change
+  // External libraries that rarely change and can be cached separately
   vendor: ['zod', 'canvas-confetti'],
   
   // Engine core - handles game loop, input, entities, scenes
@@ -23,7 +31,7 @@ const manualChunks = {
     './src/physics/MathUtils.ts',
   ],
   
-  // Game entities - vehicles, tracks, particles, camera
+  // Game entities - vehicles, tracks, particle effects, camera
   entities: [
     './src/entities/Entity.ts',
     './src/entities/CardVehicle.ts',
@@ -32,127 +40,238 @@ const manualChunks = {
     './src/entities/Camera.ts',
   ],
   
-  // Audio systems - sound synthesis and audio control
+  // Audio systems - synthesized sound effects and music
   audio: [
     './src/audio/AudioSystem.ts',
     './src/audio/AudioController.ts',
   ],
   
-  // Render system
-  render: ['./src/engine/RenderSystem.ts'],
+  // Card deck system - collectible card mechanics
+  cardDeck: ['./src/systems/CardDeck.ts'],
 };
 
 export default defineConfig({
-  // Base path for assets
+  // ============================================================================
+  // PROJECT ROOT AND BASE PATHS
+  // ============================================================================
+  root: '.',
   base: '/',
   
-  // Root directory
-  root: '.',
-  
-  // Output directory
+  // Output directory for production build
   outDir: 'dist',
   
-  // Clean output directory before build
+  // Clean output directory before build for fresh compilation
   cleanDist: true,
   
-  // Build settings
+  // ============================================================================
+  // SOURCE MAP GENERATION
+  // ============================================================================
+  // Enable source maps for both dev and production builds
+  // Dev: full inline source maps for debugging
+  // Prod: external .map files for better performance
   build: {
-    // Target browsers
-    target: 'ES2022',
+    sourcemap: true,
     
-    // Minification with Terser
+    // Rollup options for production bundle optimization
+    rollupOptions: {
+      // Entry points for multi-page app structure
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
+      
+      // Output configuration for optimized bundles
+      output: {
+        // Manual chunking for better code splitting and caching
+        manualChunks,
+        
+        // Asset file naming pattern
+        assetFileNames: ({ name }) => {
+          if (name && /\.(woff|woff2|eot|ttf|otf)$/.test(name)) {
+            return 'assets/fonts/[name][extname]';
+          }
+          if (name && /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(name)) {
+            return 'assets/images/[name]-[hash][extname]';
+          }
+          if (name && /\.css$/.test(name)) {
+            return 'assets/styles/[name]-[hash][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
+        
+        // Chunk file naming pattern
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        
+        // Inline small assets as data URIs
+        inlineDynamicImports: false,
+        
+        // Preserve module structure for better tree-shaking
+        preserveModules: false,
+      },
+    },
+    
+    // Minification settings using Terser
     minify: 'terser',
     
-    // Terser options for production optimization
+    // Terser minification options
     terserOptions: {
       compress: {
-        drop_console: false, // Keep console for debugging
-        drop_debugger: false,
+        drop_console: process.env.NODE_ENV === 'production',
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.warn', 'console.error'],
         passes: 2,
       },
       mangle: {
         safari10: true,
+        reserved: ['CardDriveDrift', 'Engine', 'PhysicsEngine', 'AudioSystem'],
       },
       format: {
         comments: false,
       },
     },
     
-    // Sourcemap generation for both dev and build
-    sourcemap: true,
+    // Target browsers for compatibility
+    target: 'es2022',
     
-    // Code splitting threshold
-    chunkSizeWarningLimit: 500,
-    
-    // Rollup rollupOptions for chunking
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
-      output: {
-        // Chunking strategy
-        manualChunks,
-        
-        // Asset handling
-        assetFileNames: ({ name }) => {
-          if (name?.endsWith('.svg')) return 'assets/favicon/[name]-[hash].[ext]';
-          if (name?.endsWith('.png')) return 'assets/icons/[name]-[hash].[ext]';
-          return 'assets/[name]-[hash].[ext]';
-        },
-        
-        // JS chunks
-        entryFileNames: 'js/[name]-[hash].js',
-        chunkFileNames: 'js/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-        
-        // Inline dynamic imports for better performance
-        inlineDynamicImports: true,
-      },
+    // Module preloading configuration
+    modulePreload: {
+      polyfill: false,
     },
+    
+    // Report size for analysis
+    reportCompressedSize: true,
+    
+    // Chunk size warning threshold (in kB)
+    chunkSizeWarningLimit: 1000,
+    
+    // CSS code splitting
+    cssCodeSplit: true,
   },
   
-  // Development server configuration
+  // ============================================================================
+  // DEVELOPMENT SERVER CONFIGURATION
+  // ============================================================================
   server: {
+    // Host binding for network access (Docker/container support)
     host: '0.0.0.0',
+    
+    // Development server port
     port: 3000,
-    strictPort: false,
-    open: false,
-    cors: true,
+    
+    // Force reload on file changes
+    force: true,
+    
+    // Hot Module Replacement (HMR) configuration
     hmr: {
-      host: 'localhost',
       protocol: 'ws',
-      clientPort: 3000,
+      host: 'localhost',
+      port: undefined, // Auto-detect
+      timeout: 30000,
+      overlay: true,
     },
+    
+    // Watch mode for file changes
     watch: {
       usePolling: false,
+      interval: 100,
+      binaryInterval: 100,
     },
+    
+    // Proxy configuration for API requests
+    proxy: {},
+    
+    // Open browser on startup
+    open: false,
+    
+    // Strict port checking
+    strictPort: true,
+    
+    // Access from local network
+    allowedHosts: true,
   },
   
-  // CSS preprocessor settings
-  css: {
-    preprocessorOptions: {
-      scss: {
-        additionalData: `@use "@/styles/variables.scss" as *;`,
-      },
-    },
+  // ============================================================================
+  // PREVIEW SERVER CONFIGURATION
+  // ============================================================================
+  preview: {
+    // Preview server port
+    port: 3000,
+    
+    // Host binding
+    host: '0.0.0.0',
+    
+    // Open browser on preview
+    open: false,
   },
   
-  // Resolve aliases
+  // ============================================================================
+  // RESOLVE ALIASES
+  // ============================================================================
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@engine': resolve(__dirname, 'src/engine'),
+      '@physics': resolve(__dirname, 'src/physics'),
+      '@entities': resolve(__dirname, 'src/entities'),
+      '@audio': resolve(__dirname, 'src/audio'),
+      '@systems': resolve(__dirname, 'src/systems'),
+    },
+    
+    // Extensions to resolve
+    extensions: ['.ts', '.js', '.tsx', '.jsx', '.json'],
+  },
+  
+  // ============================================================================
+  // OPTIMIZATION SETTINGS
+  // ============================================================================
+  optimizeDeps: {
+    // Dependencies to pre-bundle
+    include: ['zod', 'canvas-confetti'],
+    
+    // Exclude large dependencies from pre-bundling
+    exclude: [],
+    
+    // Strength of dependency discovery
+    force: false,
+    
+    // Esbuild loader for specific file types
+    esbuildOptions: {
+      // Define global constants
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+      },
     },
   },
   
-  // Optimizations
-  optimizeDeps: {
-    include: ['zod', 'canvas-confetti'],
-    exclude: ['@types/dom'],
+  // ============================================================================
+  // CSS PROCESSING
+  // ============================================================================
+  css: {
+    // CSS module configuration
+    modules: {
+      localsConvention: 'camelCaseOnly',
+      generateScopedName: '[name]__[local]___[hash:base64:5]',
+    },
+    
+    // PostCSS configuration
+    postcss: {
+      plugins: [
+        // You can add postcss plugins here if needed
+      ],
+    },
   },
   
-  // Define environment variables
-  define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
-    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-  },
+  // ============================================================================
+  // ENVIRONMENT VARIABLES
+  // ============================================================================
+  envPrefix: ['VITE_', 'CARD_'],
+  
+  // ============================================================================
+  // LOGGING AND DEBUGGING
+  // ============================================================================
+  logLevel: 'info',
+  
+  // Suppress warnings
+  clearScreen: true,
 });
