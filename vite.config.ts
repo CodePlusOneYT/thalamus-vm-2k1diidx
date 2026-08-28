@@ -55,6 +55,24 @@ export default defineConfig({
   // Clean output directory before build
   cleanDist: true,
   
+  // Development server configuration
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: false,
+    open: false,
+    watch: {
+      usePolling: false,
+    },
+    cors: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: undefined,
+      clientPort: undefined,
+    },
+  },
+  
   // Build settings
   build: {
     // Rollup options
@@ -83,109 +101,60 @@ export default defineConfig({
     // Target browsers
     target: 'ES2022',
     
-    // Minification with Terser
+    // Minification
     minify: 'terser',
     
-    // Terser options for production optimization
+    // Source maps for debugging
+    sourcemap: true,
+    
+    // Terser options for better compression
     terserOptions: {
       compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug'],
-        passes: 2,
+        drop_console: process.env.NODE_ENV === 'production',
+        drop_debugger: process.env.NODE_ENV === 'production',
+        pure_funcs: ['console.log', 'console.info'],
       },
+      mangle: true,
       format: {
         comments: false,
       },
     },
     
-    // Sourcemap generation for production debugging
-    sourcemap: true,
+    // Generate source map
+    generateSourceMaps: true,
     
-    // Code splitting size warning threshold (in kB)
+    // Optimize bundle size
     chunkSizeWarningLimit: 500,
-    
-    // Rollup bundle report for analysis
     reportCompressedSize: true,
   },
   
-  // Development server configuration
-  server: {
-    // Host binding for network access
-    host: '0.0.0.0',
-    
-    // Dev server port
-    port: 3000,
-    
-    // Open browser automatically
-    open: true,
-    
-    // Proxy configuration
-    proxy: {},
-    
-    // Hot Module Replacement (HMR)
-    hmr: {
-      // HMR WebSocket connection timeout
-      timeout: 30000,
-      
-      // Force reload instead of update on errors
-      force: false,
+  // CSS settings
+  css: {
+    preprocessorOptions: {
+      scss: {},
     },
-    
-    // File watching options
-    watch: {
-      // Use polling for filesystem watching
-      usePolling: false,
-      
-      // Interval for polling
-      interval: 1000,
+    modules: {
+      generateScopedName: '[name]_[local]_[hash:base64:5]',
     },
-    
-    // Strict port mode
-    strictPort: false,
-    
-    // Cors headers
-    cors: true,
   },
   
-  // Source map configuration for development
-  esbuild: {
-    // Preserve line numbers in source maps
-    keepNames: true,
-    
-    // Sourcemap inline for debugging
-    sourcemap: true,
-  },
-  
-  // Optimize dependencies caching
-  optimizeDeps: {
-    // Include dependencies to pre-bundle
-    include: ['zod', 'canvas-confetti'],
-    
-    // Exclude large dependencies
-    exclude: [],
-    
-    // Disable dependency discovery
-    disabled: false,
+  // Resolve aliases
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
   // Define global constants
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '1.0.0'),
-    'import.meta.env.VITE_APP_NAME': JSON.stringify('Card Drive & Drift'),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    '__APP_VERSION__': JSON.stringify(process.env.npm_package_version || '1.0.0'),
   },
   
-  // CSS processing
-  css: {
-    // Preprocessor options
-    preprocessorOptions: {},
-    
-    // PostCSS plugins
-    postcss: {},
-    
-    // Modules configuration
-    modules: {
-      localsConvention: 'camelCase',
-    },
+  // Optimizations
+  optimizeDeps: {
+    include: ['zod', 'canvas-confetti'],
+    exclude: [],
   },
 });
