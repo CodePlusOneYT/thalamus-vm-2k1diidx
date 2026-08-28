@@ -65,51 +65,35 @@ class CardDriveDrift {
 
   private render(): void {
     this.renderer.clear();
-    this.sceneMgr.render(this.renderer);
-    this.entityMgr.render(this.renderer);
+    this.entityMgr.render(this.renderer.getCanvasContext());
+    this.sceneMgr.render(this.renderer.getCanvasContext());
   }
 
   private handleInput(): void {
-    this.input.processActions();
+    this.input.update();
   }
 
   private onResize(): void {
     const canvas = this.renderer.getCanvas();
     const container = canvas.parentElement;
     
-    if (container && this.engine) {
-      const rect = container.getBoundingClientRect();
-      canvas.width = rect.width * window.devicePixelRatio;
-      canvas.height = rect.height * window.devicePixelRatio;
+    if (container) {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
       
-      this.renderer.setTransform(rect.width, rect.height);
-      this.engine.resize(canvas.width, canvas.height);
+      // Update viewport
+      this.renderer.setViewport(canvas.width, canvas.height);
     }
-  }
-
-  public destroy(): void {
-    this.engine.stop();
-    this.audio.destroy();
   }
 }
 
-// Global instance for debugging
-let instance: CardDriveDrift | null = null;
-
-window.addEventListener('DOMContentLoaded', () => {
+// Entry point
+document.addEventListener('DOMContentLoaded', () => {
   try {
-    instance = new CardDriveDrift();
-    (window as Window).__cardDriveDrift = instance;
+    const game = new CardDriveDrift();
+    window.__cardDriveDrift = game;
+    console.log('[CardDriveDrift] Game initialized successfully');
   } catch (error) {
-    console.error('[CardDriveDrift] Initialization failed:', error);
-    const errorEl = document.getElementById('error-container');
-    if (errorEl) {
-      errorEl.innerHTML = `<div style="color: #ff4444; padding: 2rem; text-align: center;">
-        <h1>Initialization Error</h1>
-        <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
-      </div>`;
-    }
+    console.error('[CardDriveDrift] Failed to initialize:', error);
   }
 });
-
-export { CardDriveDrift };
