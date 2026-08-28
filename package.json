@@ -21,12 +21,14 @@
   "dependencies": {
     "@types/dom": "^0.0.1",
     "canvas-confetti": "^1.9.3",
-    "zod": "^3.24.0"
+    "zod": "^3.22.4",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.8",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^22.7.5",
+    "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "@vitejs/plugin-react": "^4.3.1",
@@ -42,19 +44,5 @@
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.2"
-  },
-  "keywords": [
-    "game",
-    "racing",
-    "physics",
-    "drift",
-    "html5",
-    "canvas"
-  ],
-  "author": "Card Drive Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": ""
   }
 }
