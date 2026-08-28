@@ -40,127 +40,97 @@ const manualChunks = {
     './src/entities/Camera.ts',
   ],
   
-  // Audio systems - sound synthesis and audio control
+  // Audio systems - sound synthesis and effects
   audio: [
     './src/audio/AudioSystem.ts',
     './src/audio/AudioController.ts',
   ],
-  
-  // Render system
-  render: ['./src/engine/RenderSystem.ts'],
 };
 
 export default defineConfig({
-  // Base path for the application
+  // ============================================================================
+  // BASE PATH AND ROOT
+  // ============================================================================
   base: '/',
-  
-  // Root directory for source files
   root: process.cwd(),
   
-  // Build configuration
+  // ============================================================================
+  // BUILD CONFIGURATION
+  // ============================================================================
   build: {
-    // Target browser compatibility
-    target: 'es2022',
+    // Target modern browsers for best performance
+    target: 'esnext',
     
-    // Output directory
+    // Output directory structure
     outDir: 'dist',
     
-    // Source map generation for production debugging
+    // Enable sourcemaps for production debugging
     sourcemap: true,
     
-    // Minification settings using terser
+    // Minification settings using Terser
     minify: 'terser',
-    
-    // Terser minification options
     terserOptions: {
       compress: {
-        drop_console: false, // Keep console.log for debugging
+        drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.debug'],
         passes: 2,
       },
       mangle: {
-        eval: true,
-        toplevel: true,
-        keep_fnames: false,
-        keep_classnames: false,
+        reserved: ['requestAnimationFrame', 'cancelAnimationFrame', 'AudioContext'],
       },
       format: {
         comments: false,
       },
     },
     
-    // Rollup options for bundling
+    // Rollup options for better chunking
     rollupOptions: {
-      // Input entry point
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
-      
-      // Manual chunk splitting strategy
       output: {
         // Manual chunking configuration
         manualChunks,
         
-        // Asset naming pattern
-        assetFileNames: (assetInfo) => {
-          const name = assetInfo.name || '';
-          
-          if (name.endsWith('.woff') || name.endsWith('.woff2')) {
-            return 'assets/fonts/[name]-[hash][extname]';
-          } else if (name.endsWith('.svg') || name.endsWith('.png') || name.endsWith('.jpg')) {
+        // Asset handling
+        assetFileNames: (chunkInfo) => {
+          const extType = chunkInfo.name?.split('.').pop() ?? '';
+          if (/\.(png|jpe?g|gif|svg)$/.test(extType)) {
             return 'assets/images/[name]-[hash][extname]';
-          } else if (name.endsWith('.js')) {
-            return 'assets/js/[name]-[hash].js';
-          } else if (name.endsWith('.css')) {
-            return 'assets/css/[name]-[hash].css';
           }
-          
+          if (/\.(woff2?)$/.test(extType)) {
+            return 'assets/fonts/[name]-[hash][extname]';
+          }
+          if (/\.(mp3|wav)$/.test(extType)) {
+            return 'assets/audio/[name]-[hash][extname]';
+          }
           return 'assets/[name]-[hash][extname]';
         },
         
-        // Chunk naming pattern
-        entryFileNames: 'assets/js/[name]-[hash].js',
-        chunkFileNames: 'assets/js/[name]-[hash].js',
+        // Chunk naming strategy
+        entryFileNames: '[name]-[hash].js',
+        chunkFileNames: '[name]-[hash].js',
+        cssEntryFileNames: '[name]-[hash].css',
+        cssChunkFileNames: '[name]-[hash].css',
         
-        // Inline small assets as data URLs
-        inlineDynamicImports: false,
-        
-        // Generate a manifest.json file
-        preserveEntrySignatures: 'allow-extension',
+        // Preserve module structure
+        preserveModulesRoot: './src',
       },
     },
     
-    // Code splitting settings
+    // Code splitting optimization
     codeSplitting: true,
     
-    // Module preloading
-    modulePreload: {
-      polyfill: true,
-    },
+    // Limit for inline chunks
+    chunkSizeWarningLimit: 500,
     
-    // CSS handling
-    cssCodeSplit: true,
-    
-    // Empty chunks cleanup
+    // Empty output directory on build
     emptyOutDir: true,
     
-    // Manifest generation
-    manifest: true,
-    
-    // Rollup watch mode disabled for production builds
-    watch: null,
-    
-    // Chunks limit per bundle
-    chunkSizeWarningLimit: 1000,
-    
-    // Sourcemap for bundled output
-    sourcemapIgnoreList: (relativeSourcePath) => {
-      return relativeSourcePath.includes('node_modules');
-    },
+    // Build report generation
+    reportCompressedSize: true,
   },
   
-  // Development server configuration
+  // ============================================================================
+  // DEVELOPMENT SERVER CONFIGURATION
+  // ============================================================================
   server: {
     // Host binding for network access
     host: '0.0.0.0',
@@ -168,158 +138,92 @@ export default defineConfig({
     // Development server port
     port: 3000,
     
-    // Auto-open browser on start
-    open: false,
+    // Force reload on file changes
+    force: false,
     
-    // Proxy configuration for API requests
-    proxy: {},
-    
-    // HMR (Hot Module Replacement) configuration
+    // Hot Module Replacement (HMR)
     hmr: {
-      // Enable hot module replacement
-      enabled: true,
-      
-      // Client host (for custom setups)
-      host: undefined,
-      
-      // Protocol timeout
-      protocolTimeout: 30000,
-      
-      // Overlay configuration
-      overlay: {
-        errors: true,
-        runtimeErrors: true,
-      },
+      overlay: true,
+      clientPort: 443,
     },
     
-    // File watching configuration
-    watch: {
-      // Use polling instead of native file watchers
-      usePolling: false,
-      
-      // Interval for polling checks
-      interval: 1000,
-      
-      // Ignore directories
-      ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
-    },
+    // WebSocket proxy for HMR
+    wsHost: 'localhost',
+    
+    // Open browser automatically
+    open: true,
     
     // CORS handling
     cors: true,
     
-    // Strict port usage
+    // Strict port checking
     strictPort: false,
     
     // Allowed hosts
-    allowedHosts: [],
+    allowedHosts: true,
     
-    // Header injection
-    headers: {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'SAMEORIGIN',
-      'X-XSS-Protection': '1; mode=block',
+    // Watch files for rebuild
+    watch: {
+      ignored: ['**/node_modules/**', '**/dist/**'],
     },
   },
   
-  // Preview server configuration
-  preview: {
-    // Preview server host
-    host: '0.0.0.0',
-    
-    // Preview server port
-    port: 3000,
-    
-    // Open browser automatically
-    open: false,
-    
-    // Proxy configuration
-    proxy: {},
-    
-    // Strict port usage
-    strictPort: false,
-    
-    // Headers for security
-    headers: {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'SAMEORIGIN',
-      'X-XSS-Protection': '1; mode=block',
-    },
-  },
-  
-  // Optimization settings
+  // ============================================================================
+  // OPTIMIZATION SETTINGS
+  // ============================================================================
   optimizeDeps: {
-    // Dependencies to exclude from optimization
-    exclude: [],
-    
-    // Include specific dependencies
+    // Pre-bundle dependencies for faster load times
     include: ['zod', 'canvas-confetti'],
     
-    // Force full resolution of dependencies
-    force: false,
+    // Exclude heavy dependencies from pre-bundling
+    exclude: [],
     
-    // Hold until SSR entry
-    holdUntilCsrEnd: true,
+    // Disable preload to prevent conflicts
+    noDiscovery: false,
     
-    // Entry points to scan
+    // Keep node_modules symlinks
+    keepNodeModulesSymlinks: false,
+    
+    // Entry point for dependency analysis
     entries: ['./src/main.ts'],
     
-    // Discovery paths
-    discover: true,
-    
-    // Max number of files to cache
-    maxParallelFileOps: 50,
+    // Enable experimental preload
+    force: false,
   },
   
-  // Resolver aliases for cleaner imports
+  // ============================================================================
+  // ENVIRONMENT VARIABLES
+  // ============================================================================
+  envPrefix: ['VITE_', 'APP_'],
+  
+  // ============================================================================
+  // RESOLVE ALIASES
+  // ============================================================================
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@engine': resolve(__dirname, 'src/engine'),
-      '@physics': resolve(__dirname, 'src/physics'),
-      '@entities': resolve(__dirname, 'src/entities'),
-      '@audio': resolve(__dirname, 'src/audio'),
-      '@systems': resolve(__dirname, 'src/systems'),
+      '@': resolve(__dirname, './src'),
+      '@engine': resolve(__dirname, './src/engine'),
+      '@physics': resolve(__dirname, './src/physics'),
+      '@entities': resolve(__dirname, './src/entities'),
+      '@audio': resolve(__dirname, './src/audio'),
+      '@systems': resolve(__dirname, './src/systems'),
     },
   },
   
-  // Environment variables
-  envPrefix: 'VITE_',
-  
-  // CSS configuration
+  // ============================================================================
+  // CSS PREPROCESSOR CONFIGURATION
+  // ============================================================================
   css: {
-    // Preprocessor options
-    preprocessorOptions: {},
-    
-    // PostCSS plugins
-    postcss: {},
-    
-    // Modules configuration
-    modules: {
-      localsConvention: 'camelCase',
-      generateScopedName: '[name]__[local]--[hash:base64:5]',
-    },
+    devSourcemap: true,
   },
   
-  // Define global constants
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    __APP_VERSION__: JSON.stringify('1.0.0'),
-    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-    __BUILD_TIMESTAMP__: JSON.stringify(Date.now()),
-  },
-  
-  // Log level
-  logLevel: 'info',
-  
-  // Clear console on restart
-  clearScreen: true,
-  
-  // Custom environment variables
-  envDir: process.cwd(),
-  
-  // Cache directory
-  cacheDir: 'node_modules/.vite',
-  
-  // Timezone override
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  // ============================================================================
+  // PLUGIN EXTENSIONS POINT (placeholder for future plugins)
+  // ============================================================================
+  // Plugins can be added here:
+  // plugins: [
+  //   react(),
+  //   svgr(),
+  //   ...
+  // ],
 });
