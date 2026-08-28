@@ -76,7 +76,6 @@ export default defineConfig({
         // JS chunks
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     
@@ -117,100 +116,86 @@ export default defineConfig({
   
   // Development server settings
   server: {
-    // Host for network access
+    // Host for external access
     host: '0.0.0.0',
     
-    // Port configuration
-    port: parseInt(process.env.VITE_PORT || '3000'),
+    // Port for development
+    port: 3000,
     
-    // Open browser on start
-    open: false,
+    // Open browser automatically
+    open: true,
     
-    // Proxy configurations
+    // HMR settings
+    hmr: {
+      // Heartbeat interval
+      heartbeat: 10000,
+      
+      // Timeout for connection
+      timeout: 30000,
+      
+      // Overlay errors in browser
+      overlay: true,
+    },
+    
+    // Proxy settings for API requests
     proxy: {},
     
-    // Hot Module Replacement (HMR)
-    hmr: {
-      enabled: true,
-      clientPort: parseInt(process.env.VITE_PORT || '3000'),
-    },
-    
-    // File watching
+    // Hot reload optimization
     watch: {
+      // Use polling for file watching
       usePolling: false,
-      interval: 100,
+      
+      // Interval for polling
+      interval: 1000,
+      
+      // Ignore certain files/directories
+      ignored: ['**/node_modules/**', '**/dist/**'],
     },
     
-    // Strict port checking
-    strictPort: false,
-    
-    // CORS headers
+    // CORS configuration
     cors: true,
     
-    // Allowed origins
-    allowedHosts: ['localhost', '127.0.0.1'],
+    // Strict port usage
+    strictPort: false,
+    
+    // Allow local network access
+    allowedHosts: true,
+    
+    // Security headers for dev server
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+    },
   },
   
   // Optimization settings
   optimizeDeps: {
+    // Include dependencies to pre-bundle
     include: ['zod', 'canvas-confetti'],
+    
+    // Exclude from pre-bundling
     exclude: [],
+    
+    // Force re-bundle on changes
     force: false,
-  },
-  
-  // Define environment variables for client-side usage
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV !== 'production'),
-    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
-  },
-  
-  // TypeScript configuration override
-  esbuild: {
-    // Keep JSX for potential future React components
-    jsx: 'preserve',
-    jsxFactory: 'h',
-    jsxFragment: 'Fragment',
-    // Loader for additional file types
-    loader: {
-      '.json': 'jsx',
-    },
   },
   
   // CSS processing
   css: {
     // Preprocessor options
-    preprocessorOptions: {
-      scss: {
-        // Additional data for SCSS files
-        additionalData: '',
-      },
-    },
+    preprocessorOptions: {},
+    
     // PostCSS plugins
-    postcss: {
-      plugins: [],
-    },
+    postcss: {},
+    
     // Modules configuration
     modules: {
-      localsConvention: 'camelCase',
+      // Generate class names
+      classNameStrategy: 'local',
     },
   },
   
-  // Resolve aliases
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
-      '@engine': resolve(__dirname, 'src/engine'),
-      '@physics': resolve(__dirname, 'src/physics'),
-      '@entities': resolve(__dirname, 'src/entities'),
-      '@audio': resolve(__dirname, 'src/audio'),
-      '@systems': resolve(__dirname, 'src/systems'),
-    },
-  },
-  
-  // Plugin array for extensions
-  plugins: [],
-  
-  // Log level
-  logLevel: 'info',
+  // Environment variables prefix
+  envPrefix: 'VITE_',
 });
