@@ -36,6 +36,7 @@ class CardDriveDrift {
   private timeElapsed: number = 0;
   private gameOver: boolean = false;
   private gameStarted: boolean = false;
+  private highScore: number = 0;
 
   constructor() {
     this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
@@ -88,277 +89,276 @@ class CardDriveDrift {
   }
 
   private resizeCanvas(): void {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = this.canvas.getBoundingClientRect();
+    const container = document.getElementById('gameContainer');
+    if (!container) return;
     
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
+    const rect = container.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
     
-    this.ctx.scale(dpr, dpr);
+    // Store aspect ratio
+    (this.canvas as any).aspectRatio = this.canvas.width / this.canvas.height;
   }
 
   private setupInputListeners(): void {
-    // Keyboard events
-    document.addEventListener('keydown', (e: KeyboardEvent) => this.input.onKeyDown(e));
-    document.addEventListener('keyup', (e: KeyboardEvent) => this.input.onKeyUp(e));
+    this.input.setupKeyControls();
     
-    // Touch events for mobile
-    this.canvas.addEventListener('touchstart', (e: TouchEvent) => {
+    // Handle start/restart on first key press
+    document.addEventListener('keydown', (e) => {
+      if (!this.gameStarted && !this.gameOver) {
+        this.handleStart(e);
+      }
+    });
+    
+    // Mobile touch controls
+    this.setupTouchControls();
+  }
+
+  private setupTouchControls(): void {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    
+    this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      this.gameStarted = true;
-      this.audio.resume();
-      this.handleStart();
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      
+      if (!this.gameStarted && !this.gameOver) {
+        this.handleStart();
+      }
     }, { passive: false });
     
-    this.canvas.addEventListener('touchmove', (e: TouchEvent) => {
+    this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
-      const touch = e.touches[0];
-      this.input.touchX = touch.clientX;
-      this.input.touchY = touch.clientY;
-      this.input.isTouching = true;
+      const touchX = e.touches[0].clientX;
+      const touchY = e.touches[0].clientY;
+      
+      const deltaX = touchX - touchStartX;
+      const deltaY = touchY - touchStartY;
+      
+      // Update input based on touch movement
+      this.input.update({
+        left: Math.sign(deltaX) < 0 ? 1 : 0,
+        right: Math.sign(deltaX) > 0 ? 1 : 0,
+        up: Math.sign(deltaY) < 0 ? 1 : 0,
+        down: Math.sign(deltaY) > 0 ? 1 : 0,
+      });
     }, { passive: false });
     
-    this.canvas.addEventListener('touchend', (e: TouchEvent) => {
+    this.canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      this.input.isTouching = false;
-    });
-    
-    // Mouse events for desktop
-    this.canvas.addEventListener('mousedown', (e: MouseEvent) => {
-      this.gameStarted = true;
-      this.audio.resume();
-      this.handleStart();
-    });
-    
-    this.canvas.addEventListener('mousemove', (e: MouseEvent) => {
-      const rect = this.canvas.getBoundingClientRect();
-      this.input.mouseX = e.clientX - rect.left;
-      this.input.mouseY = e.clientY - rect.top;
-    });
-    
-    this.canvas.addEventListener('mouseup', () => {
-      this.input.isMousePressed = false;
+      this.input.releaseAll();
     });
   }
 
   private createInitialScene(): void {
-    // Clear entities
-    this.entityMgr.clearAll();
+    // Clear existing entities
+    this.entityMgr.clear();
     
-    // Create camera
-    const camera = new Camera(800, 600);
-    this.entityMgr.add(camera);
-    
-    // Create track segments
-    this.generateTrackSegments();
+    // Create track
+    this.createTrack();
     
     // Create player vehicle
-    this.vehicle = new CardVehicle(100, 400);
-    this.entityMgr.add(this.vehicle);
+    this.createPlayerVehicle();
     
-    // Create particles system
-    for (let i = 0; i < 50; i++) {
-      this.entityMgr.add(new Particle(0, 0));
-    }
-    
-    this.score = 0;
-    this.distance = 0;
-    this.timeElapsed = 0;
-    this.gameOver = false;
+    // Create camera
+    this.createCamera();
   }
 
-  private generateTrackSegments(): void {
-    let x = 0;
-    let y = 400;
+  private createTrack(): void {
+    const segments: TrackSegment[] = [];
+    const segmentCount = 100;
+    let currentX = 0;
+    let currentY = 300;
+    const segmentWidth = 400;
     
-    for (let i = 0; i < 200; i++) {
-      const segmentWidth = 100 + Math.random() * 100;
-      const segmentHeight = 30 + Math.random() * 40;
-      
-      // Add variation to height
-      if (i > 0 && i % 10 !== 0) {
-        y += (Math.random() - 0.5) * 80;
-        y = Math.max(200, Math.min(500, y));
+    for (let i = 0; i < segmentCount; i++) {
+      // Add some variation to height
+      if (i > 5 && i < segmentCount - 5) {
+        currentY += (Math.random() - 0.5) * 100;
+        currentY = Math.max(200, Math.min(500, currentY));
       }
       
-      const segment = new TrackSegment(x, y, segmentWidth, segmentHeight);
-      this.entityMgr.add(segment);
-      x += segmentWidth;
+      const segment = new TrackSegment(currentX, currentY, segmentWidth);
+      segments.push(segment);
+      currentX += segmentWidth;
     }
+    
+    segments.forEach(segment => this.entityMgr.addEntity(segment));
+  }
+
+  private createPlayerVehicle(): void {
+    this.vehicle = new CardVehicle(100, 200);
+    this.entityMgr.addEntity(this.vehicle);
+  }
+
+  private createCamera(): void {
+    const camera = new Camera(this.canvas.width / 2, this.canvas.height / 2);
+    this.entityMgr.addEntity(camera);
   }
 
   private showStartScreen(): void {
-    const centerX = this.canvas.width / (window.devicePixelRatio || 1) / 2;
-    const centerY = this.canvas.height / (window.devicePixelRatio || 1) / 2;
+    const uiContainer = document.getElementById('uiContainer');
+    if (!uiContainer) return;
     
-    this.renderer.drawText('CARD DRIVE & DRIFT', centerX, centerY - 100, 48, '#ffffff');
-    this.renderer.drawText('Press any key or tap to start', centerX, centerY, 24, '#ffffff');
-    this.renderer.drawText('Arrow keys/WASD to drive', centerX, centerY + 40, 18, '#cccccc');
-    this.renderer.drawText('Space/Shift to boost', centerX, centerY + 70, 18, '#cccccc');
-  }
-
-  private handleStart(): void {
-    if (!this.gameStarted) {
-      this.gameStarted = true;
-      this.audio.playMusic();
-      
-      // Hide start screen
-      const uiDiv = document.getElementById('uiOverlay') as HTMLDivElement;
-      if (uiDiv) {
-        uiDiv.style.display = 'none';
-      }
-      
-      // Start game loop if not running
-      if (!this.animationId) {
-        this.lastTime = performance.now();
-        this.animationId = requestAnimationFrame(this.gameLoop);
-      }
+    uiContainer.innerHTML = `
+      <div id="startScreen" class="screen active">
+        <h1>🃏 Card Drive & Drift</h1>
+        <p>Advanced Physics Racing Game</p>
+        <div class="instructions">
+          <h3>Controls:</h3>
+          <p>⬆️ / W - Accelerate</p>
+          <p>⬇️ / S - Brake/Reverse</p>
+          <p>⬅️ / A - Steer Left</p>
+          <p>➡️ / D - Steer Right</p>
+          <p>Space - Handbrake</p>
+        </div>
+        <button id="startBtn" class="btn-primary">START ENGINE</button>
+      </div>
+      <div id="highScoreDisplay" class="hidden"></div>
+    `;
+    
+    document.getElementById('startBtn')?.addEventListener('click', () => {
+      this.handleStart();
+    });
+    
+    // Load high score
+    const storedHighScore = localStorage.getItem('cardDriveDriftHighScore');
+    if (storedHighScore) {
+      this.highScore = parseFloat(storedHighScore);
+      document.getElementById('highScoreDisplay')!.innerHTML = `High Score: ${this.highScore.toFixed(2)}m`;
     }
   }
 
-  private gameLoop(currentTime: number): void {
-    if (!this.gameStarted) {
-      this.animationId = requestAnimationFrame(this.gameLoop);
-      return;
+  private handleStart(event?: KeyboardEvent): void {
+    if (this.gameStarted || this.gameOver) return;
+    
+    this.gameStarted = true;
+    this.lastTime = performance.now();
+    
+    // Hide start screen
+    const startScreen = document.getElementById('startScreen');
+    if (startScreen) startScreen.classList.remove('active');
+    
+    // Resume audio context if needed
+    this.audio.resume();
+    
+    // Start game loop
+    this.animationId = requestAnimationFrame((time) => this.gameLoop(time));
+  }
+
+  private restartGame(): void {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
     }
     
-    const deltaTime = (currentTime - this.lastTime) / 1000;
-    this.lastTime = currentTime;
+    this.gameOver = false;
+    this.gameStarted = false;
+    this.score = 0;
+    this.distance = 0;
+    this.timeElapsed = 0;
+    
+    this.createInitialScene();
+    this.showStartScreen();
+  }
+
+  private updateUI(): void {
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const speedDisplay = document.getElementById('speedDisplay');
+    const driftDisplay = document.getElementById('driftDisplay');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+    
+    if (scoreDisplay) scoreDisplay.textContent = `Score: ${this.score.toFixed(0)}`;
+    if (speedDisplay) speedDisplay.textContent = `Speed: ${(this.vehicle?.velocity.x || 0).toFixed(0)} km/h`;
+    if (driftDisplay) driftDisplay.textContent = `Drift: ${this.vehicle?.driftScore.toFixed(0)} pts`;
+    if (distanceDisplay) distanceDisplay.textContent = `Distance: ${this.distance.toFixed(0)}m`;
+  }
+
+  private showGameOverScreen(): void {
+    const uiContainer = document.getElementById('uiContainer');
+    if (!uiContainer) return;
+    
+    // Save high score
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      localStorage.setItem('cardDriveDriftHighScore', this.highScore.toString());
+    }
+    
+    uiContainer.innerHTML = `
+      <div id="gameOverScreen" class="screen active">
+        <h1>💥 CRASHED!</h1>
+        <p class="final-score">Final Score: ${this.score.toFixed(0)}</p>
+        <p class="final-distance">Distance: ${this.distance.toFixed(0)}m</p>
+        <p class="final-time">Time: ${this.timeElapsed.toFixed(1)}s</p>
+        <button id="restartBtn" class="btn-primary">RETRY</button>
+        <button id="homeBtn" class="btn-secondary">MAIN MENU</button>
+      </div>
+    `;
+    
+    document.getElementById('restartBtn')?.addEventListener('click', () => {
+      this.restartGame();
+    });
+    
+    document.getElementById('homeBtn')?.addEventListener('click', () => {
+      this.restartGame();
+    });
+  }
+
+  private gameLoop(timestamp: number): void {
+    if (!this.gameStarted) return;
+    
+    const deltaTime = (timestamp - this.lastTime) / 1000;
+    this.lastTime = timestamp;
     
     // Cap delta time to prevent huge jumps
     const cappedDelta = Math.min(deltaTime, 0.1);
     
+    // Update physics
+    this.physics.update(cappedDelta);
+    
+    // Update entities
+    this.entityMgr.update(cappedDelta);
+    
     // Update game state
-    this.update(cappedDelta);
+    if (this.vehicle) {
+      this.distance += Math.abs(this.vehicle.velocity.x) * cappedDelta;
+      this.timeElapsed += cappedDelta;
+      
+      // Calculate score based on distance and drift
+      this.score = Math.floor(this.distance * 10 + this.vehicle.driftScore * 0.5);
+    }
+    
+    // Check collision with ground (game over condition)
+    if (this.vehicle && this.vehicle.isCrashed()) {
+      this.gameOver = true;
+      this.audio.playSound('crash');
+      this.showGameOverScreen();
+      return;
+    }
+    
+    // Update camera
+    this.entityMgr.getEntities().forEach(entity => {
+      if (entity instanceof Camera) {
+        (entity as Camera).update(this.vehicle);
+      }
+    });
     
     // Render
-    this.render();
+    this.renderer.render(this.entityMgr.getEntities(), this.vehicle);
+    
+    // Update UI
+    this.updateUI();
     
     // Continue loop
-    this.animationId = requestAnimationFrame(this.gameLoop);
-  }
-
-  private update(deltaTime: number): void {
-    if (this.gameOver) return;
-    
-    // Update time
-    this.timeElapsed += deltaTime;
-    
-    // Update vehicle
-    if (this.vehicle) {
-      this.vehicle.update(deltaTime, this.input);
-      
-      // Update score based on distance traveled
-      this.distance = this.vehicle.position.x;
-      this.score = Math.floor(this.distance / 10);
-      
-      // Check collision with ground
-      if (this.vehicle.position.y > 600) {
-        this.triggerGameOver();
-      }
-      
-      // Update camera to follow vehicle
-      const camera = this.entityMgr.getEntitiesByType(Camera)[0] as Camera;
-      if (camera) {
-        camera.targetX = this.vehicle.position.x;
-      }
+    if (!this.gameOver) {
+      this.animationId = requestAnimationFrame((time) => this.gameLoop(time));
     }
-    
-    // Update all entities
-    const entities = this.entityMgr.getAll();
-    for (const entity of entities) {
-      if (entity instanceof Particle) {
-        entity.update(deltaTime);
-      }
-    }
-  }
-
-  private render(): void {
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
-    
-    // Clear canvas
-    this.ctx.fillStyle = '#1a1a2e';
-    this.ctx.fillRect(0, 0, width, height);
-    
-    // Get camera
-    const cameras = this.entityMgr.getEntitiesByType(Camera);
-    const camera = cameras.length > 0 ? cameras[0] as Camera : null;
-    
-    // Save context for camera transform
-    this.ctx.save();
-    if (camera) {
-      this.ctx.translate(-camera.x, -camera.y);
-    }
-    
-    // Render all non-camera entities
-    const entities = this.entityMgr.getAll();
-    for (const entity of entities) {
-      if (!(entity instanceof Camera)) {
-        this.renderer.renderEntity(entity);
-      }
-    }
-    
-    // Restore context
-    this.ctx.restore();
-    
-    // Render UI overlay
-    this.renderUI(width, height);
-  }
-
-  private renderUI(width: number, height: number): void {
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    this.ctx.fillRect(10, 10, 200, 100);
-    
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = 'bold 16px Arial';
-    this.ctx.fillText(`Score: ${this.score}`, 20, 35);
-    this.ctx.fillText(`Distance: ${Math.floor(this.distance)}m`, 20, 60);
-    this.ctx.fillText(`Time: ${this.formatTime(this.timeElapsed)}`, 20, 85);
-  }
-
-  private formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 100);
-    return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-  }
-
-  private triggerGameOver(): void {
-    this.gameOver = true;
-    this.audio.playSound('crash');
-    
-    // Show game over screen
-    const uiDiv = document.getElementById('uiOverlay') as HTMLDivElement;
-    if (uiDiv) {
-      uiDiv.innerHTML = `
-        <div class="game-over-screen">
-          <h1>GAME OVER</h1>
-          <p class="final-score">Score: ${this.score}</p>
-          <p class="final-distance">Distance: ${Math.floor(this.distance)}m</p>
-          <p class="final-time">Time: ${this.formatTime(this.timeElapsed)}</p>
-          <button onclick="__cardDriveDrift.restartGame()">Play Again</button>
-        </div>
-      `;
-      uiDiv.style.display = 'flex';
-    }
-  }
-
-  restartGame(): void {
-    this.createInitialScene();
-    
-    const uiDiv = document.getElementById('uiOverlay') as HTMLDivElement;
-    if (uiDiv) {
-      uiDiv.style.display = 'none';
-    }
-    
-    this.gameStarted = true;
-    this.lastTime = performance.now();
   }
 }
 
-// Initialize game when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  const game = new CardDriveDrift();
-  game.init().catch(console.error);
-});
+// Initialize game
+const game = new CardDriveDrift();
+game.init();
+
+export { CardDriveDrift };
