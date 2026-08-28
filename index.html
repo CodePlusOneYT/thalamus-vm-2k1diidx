@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Card Drive & Drift - Advanced Physics Racing Game">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Card Drive & Drift">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+  <title>Card Drive & Drift</title>
+</head>
+<body>
+  <div id="game-root"></div>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-overlay" class="ui-overlay" aria-hidden="true">
+    <div id="hud" class="hud">
+      <div class="hud-left">
+        <div class="speedometer">
+          <canvas id="speedometer-canvas" width="120" height="120" aria-label="Speedometer"></canvas>
+          <div class="speed-value" id="speed-value">0</div>
+          <div class="speed-unit">KM/H</div>
+        </div>
+        <div class="gear-display" id="gear-display">N</div>
+      </div>
+      <div class="hud-center">
+        <div class="drift-score" id="drift-score" aria-live="polite">
+          <span class="label">DRIFT</span>
+          <span class="value" id="drift-value">0</span>
+        </div>
+        <div class="combo-multiplier" id="combo-multiplier" hidden>
+          <span class="label">COMBO</span>
+          <span class="value" id="combo-value">x1</span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="lap-timer" id="lap-timer">
+          <span class="label">LAP</span>
+          <span class="value" id="lap-time">00:00.000</span>
+        </div>
+        <div class="best-lap" id="best-lap">
+          <span class="label">BEST</span>
+          <span class="value" id="best-time">--:--.---</span>
+        </div>
+        <div class="lap-counter" id="lap-counter">
+          <span class="label">LAP</span>
+          <span class="value" id="lap-number">1/3</span>
+        </div>
+      </div>
+    </div>
+    <div id="drift-indicator" class="drift-indicator" hidden>
+      <div class="drift-angle">
+        <span class="label">ANGLE</span>
+        <span class="value" id="angle-value">0°</span>
+      </div>
+      <div class="drift-bar">
+        <div class="drift-bar-fill" id="drift-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  <div id="menus" class="menus" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div id="main-menu" class="menu-panel active">
+      <h1 id="menu-title">CARD DRIVE &amp; DRIFT</h1>
+      <p class="subtitle">ADVANCED PHYSICS RACING</p>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="start-career">CAREER MODE</button>
+        <button class="menu-btn" data-action="time-trial">TIME TRIAL</button>
+        <button class="menu-btn" data-action="free-roam">FREE ROAM</button>
+        <button class="menu-btn" data-action="settings">SETTINGS</button>
+      </div>
+      <div class="menu-footer">
+        <p>WASD / ARROWS — Drive &nbsp;|&nbsp; SPACE — Handbrake &nbsp;|&nbsp; SHIFT — Boost</p>
+        <p class="version">v1.0.0 &copy; 2026</p>
+      </div>
+    </div>
+    <div id="pause-menu" class="menu-panel" hidden>
+      <h2>PAUSED</h2>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="resume">RESUME</button>
+        <button class="menu-btn" data-action="restart">RESTART</button>
+        <button class="menu-btn" data-action="settings">SETTINGS</button>
+        <button class="menu-btn" data-action="quit">QUIT TO MENU</button>
+      </div>
+    </div>
+    <div id="settings-menu" class="menu-panel" hidden>
+      <h2>SETTINGS</h2>
+      <div class="settings-grid">
+        <div class="setting-row">
+          <label for="setting-graphics">Graphics Quality</label>
+          <select id="setting-graphics">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="ultra">Ultra</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="setting-vsync">V-Sync</label>
+          <select id="setting-vsync">
+            <option value="on" selected>On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="setting-master-volume">Master Volume</label>
+          <input type="range" id="setting-master-volume" min="0" max="100" value="80">
+        </div>
+        <div class="setting-row">
+          <label for="setting-sfx-volume">SFX Volume</label>
+          <input type="range" id="setting-sfx-volume" min="0" max="100" value="70">
+        </div>
+        <div class="setting-row">
+          <label for="setting-music-volume">Music Volume</label>
+          <input type="range" id="setting-music-volume" min="0" max="100" value="50">
+        </div>
+        <div class="setting-row">
+          <label for="setting-controls">Control Scheme</label>
+          <select id="setting-controls">
+            <option value="keyboard" selected>Keyboard (WASD/Arrows)</option>
+            <option value="gamepad">Gamepad</option>
+            <option value="touch">Touch (Mobile)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="setting-drift-assist">Drift Assist</label>
+          <select id="setting-drift-assist">
+            <option value="off">Off (Simulation)</option>
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High (Arcade)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="setting-traction-control">Traction Control</label>
+          <select id="setting-traction-control">
+            <option value="off">Off</option>
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="setting-abs">ABS</label>
+          <select id="setting-abs">
+            <option value="off">Off</option>
+            <option value="on" selected>On</option>
+          </select>
+        </div>
+      </div>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="apply-settings">APPLY</button>
+        <button class="menu-btn" data-action="back">BACK</button>
+      </div>
+    </div>
+    <div id="vehicle-select" class="menu-panel" hidden>
+      <h2>SELECT VEHICLE</h2>
+      <div class="vehicle-grid" id="vehicle-grid"></div>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="confirm-vehicle">CONFIRM</button>
+        <button class="menu-btn" data-action="back">BACK</button>
+      </div>
+    </div>
+    <div id="track-select" class="menu-panel" hidden>
+      <h2>SELECT TRACK</h2>
+      <div class="track-grid" id="track-grid"></div>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="confirm-track">START RACE</button>
+        <button class="menu-btn" data-action="back">BACK</button>
+      </div>
+    </div>
+    <div id="results-menu" class="menu-panel" hidden>
+      <h2 id="results-title">RACE COMPLETE</h2>
+      <div class="results-stats" id="results-stats"></div>
+      <div class="menu-buttons">
+        <button class="menu-btn primary" data-action="retry">RETRY</button>
+        <button class="menu-btn" data-action="next-track">NEXT TRACK</button>
+        <button class="menu-btn" data-action="main-menu">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+  <div id="loading-screen" class="loading-screen" role="status" aria-live="polite">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">INITIALIZING PHYSICS ENGINE...</p>
+    <div class="loading-bar"><div class="loading-progress" id="loading-progress"></div></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

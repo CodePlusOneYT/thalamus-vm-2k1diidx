@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Card Drive & Drift - Advanced Physics Racing Game">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Card Drive & Drift">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Card Drive & Drift</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-primary: #00d4ff;
+      --color-secondary: #ff6b00;
+      --color-accent: #ff006e;
+      --color-dark: #0a0a12;
+      --color-darker: #050508;
+      --color-light: #ffffff;
+      --color-gray: #8888aa;
+      --color-success: #00ff88;
+      --color-warning: #ffcc00;
+      --color-danger: #ff4444;
+      --font-display: 'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+      --spacing-xs: 0.25rem;
+      --spacing-sm: 0.5rem;
+      --spacing-md: 1rem;
+      --spacing-lg: 1.5rem;
+      --spacing-xl: 2rem;
+      --spacing-xxl: 3rem;
+      --border-radius-sm: 4px;
+      --border-radius-md: 8px;
+      --border-radius-lg: 16px;
+      --border-radius-full: 9999px;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+      --transition-fast: 0.15s ease;
+      --transition-normal: 0.3s ease;
+      --transition-slow: 0.5s ease;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--color-darker);
+      font-family: var(--font-body);
+      color: var(--color-light);
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 50%, #0a0a12 100%);
+    }
+
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .ui-overlay {
+      position: absolute;
+      pointer-events: none;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+    }
+
+    .ui-layer {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: auto;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--color-darker);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity var(--transition-slow), visibility var(--transition-slow);
+    }
+
+    #loading-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 80px;
+      height: 80px;
+      border: 4px solid var(--color-dark);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-family: var(--font-display);
+      font-size: clamp(1.25rem, 3vw, 2rem);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .loading-progress {
+      margin-top: var(--spacing-md);
+      font-family: var(--font-body);
+      color: var(--color-gray);
+      font-size: 0.875rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* Main Menu */
+    #main-menu {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.1) 0%, transparent 70%),
+                  linear-gradient(180deg, var(--color-darker) 0%, var(--color-dark) 100%);
+      z-index: 500;
+      transition: opacity var(--transition-slow), visibility var(--transition-slow);
+    }
+
+    #main-menu.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .menu-header {
+      text-align: center;
+      margin-bottom: var(--spacing-xxl);
+      animation: fadeInUp 0.8s ease-out;
+    }
+
+    .game-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 50%, var(--color-accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.5));
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .game-subtitle {
+      font-family: var(--font-body);
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      color: var(--color-gray);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .menu-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      animation: fadeInUp 0.8s ease-out 0.2s backwards;
+    }
+
+    .menu-button {
+      min-width: 280px;
+      padding: var(--spacing-md) var(--spacing-xl);
+      font-family: var(--font-display);
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-light);
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(255, 107, 0, 0.2) 100%);
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      border-radius: var(--border-radius-lg);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: all var(--transition-normal);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-button::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.5s ease;
+    }
+
+    .menu-button:hover::before {
+      transform: translateX(100%);
+    }
+
+    .menu-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
+      border-color: var(--color-primary);
+    }
+
+    .menu-button:active {
+      transform: translateY(0);
+    }
+
+    .menu-button.primary {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.4) 0%, rgba(255, 107, 0, 0.4) 100%);
+      border-color: var(--color-primary);
+    }
+
+    .menu-button.secondary {
+      background: linear-gradient(135deg, rgba(255, 107, 0, 0.3) 0%, rgba(255, 0, 110, 0.3) 100%);
+      border-color: var(--color-secondary);
+    }
+
+    .menu-divider {
+      width: 100px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-gray), transparent);
+      margin: var(--spacing-lg) auto;
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+    }
+
+    #hud.visible {
+      display: block;
+    }
+
+    .hud-top {
+      position: absolute;
+      top: var(--spacing-md);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: var(--spacing-lg);
+      align-items: center;
+    }
+
+    .lap-counter {
+      font-family: var(--font-display);
+      font-size: clamp(1rem, 2vw, 1.5rem);
+      font-weight: 700;
+      color: var(--color-primary);
+      background: rgba(0, 0, 0, 0.6);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--border-radius-md);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+    }
+
+    .timer {
+      font-family: var(--font-display);
+      font-size: clamp(1.25rem, 3vw, 2rem);
+      font-weight: 700;
+      color: var(--color-light);
+      background: rgba(0, 0, 0, 0.6);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--border-radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .hud-bottom {
+      position: absolute;
+      bottom: var(--spacing-md);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: var(--spacing-lg);
+      align-items: flex-end;
+    }
+
+    .speedometer {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+      border: 3px solid var(--color-primary);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+    }
+
+    .speed-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--color-light);
+      line-height: 1;
+    }
+
+    .speed-unit {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--color-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .gear-indicator {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 40px;
+      height: 40px;
+      background: var(--color-primary);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-darker);
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+
+    .drift-meter {
+      position: absolute;
+      right: calc(100% + var(--spacing-md));
+      bottom: 0;
+      width: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .drift-label {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--color-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .drift-bar-container {
+      width: 10px;
+      height: 100px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .drift-bar {
+      width: 100%;
+      height: 0%;
+      background: linear-gradient(180deg, var(--color-warning) 0%, var(--color-danger) 100%);
+      transition: height 0.1s ease;
+    }
+
+    .drift-score {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-warning);
+      text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+      margin-top: var(--spacing-sm);
+    }
+
+    .controls-hint {
+      position: absolute;
+      bottom: var(--spacing-lg);
+      right: var(--spacing-md);
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--color-gray);
+      text-align: right;
+    }
+
+    .control-row {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .control-key {
+      display: inline-block;
+      min-width: 24px;
+      padding: 2px 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      text-align: center;
+    }
+
+    /* Pause Menu */
+    #pause-menu {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 18, 0.9);
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 600;
+    }
+
+    #pause-menu.visible {
+      display: flex;
+    }
+
+    .pause-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-light);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    /* Results Screen */
+    #results-screen {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.15) 0%, rgba(255, 107, 0, 0.15) 50%, transparent 100%),
+                  linear-gradient(180deg, var(--color-darker) 0%, var(--color-dark) 100%);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 700;
+    }
+
+    #results-screen.visible {
+      display: flex;
+    }
+
+    .results-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .results-stats {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-xl);
+      animation: fadeInUp 0.6s ease-out;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-md) var(--spacing-lg);
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: var(--border-radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 320px;
+    }
+
+    .stat-label {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      color: var(--color-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-light);
+    }
+
+    .stat-value.highlight {
+      color: var(--color-primary);
+      text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+    }
+
+    .rank-badge {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 900;
+      margin-bottom: var(--spacing-lg);
+      animation: scaleIn 0.6s ease-out;
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    .rank-gold {
+      background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
+      color: var(--color-darker);
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+    }
+
+    .rank-silver {
+      background: linear-gradient(135deg, #c0c0c0 0%, #a8a8a8 100%);
+      color: var(--color-darker);
+      box-shadow: 0 0 30px rgba(192, 192, 192, 0.5);
+    }
+
+    .rank-bronze {
+      background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+      color: var(--color-light);
+      box-shadow: 0 0 30px rgba(205, 127, 50, 0.5);
+    }
+
+    .rank-none {
+      background: linear-gradient(135deg, #888888 0%, #666666 100%);
+      color: var(--color-light);
+    }
+
+    /* Tutorial Overlay */
+    #tutorial-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(10, 10, 18, 0.95);
+      backdrop-filter: blur(12px);
+      padding: var(--spacing-xl);
+      border-radius: var(--border-radius-lg);
+      border: 2px solid var(--color-primary);
+      max-width: 500px;
+      z-index: 800;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .tutorial-step {
+      display: none;
+      text-align: center;
+    }
+
+    .tutorial-step.active {
+      display: block;
+    }
+
+    .tutorial-icon {
+      font-size: 3rem;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .tutorial-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .tutorial-description {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      color: var(--color-gray);
+      line-height: 1.6;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .tutorial-controls {
+      display: flex;
+      justify-content: center;
+      gap: var(--spacing-md);
+    }
+
+    .tutorial-btn {
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-light);
+      background: var(--color-primary);
+      border: none;
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .tutorial-btn:hover {
+      background: var(--color-secondary);
+      transform: translateY(-2px);
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .menu-button {
+        min-width: 240px;
+      }
+
+      .hud-bottom {
+        flex-direction: row;
+        gap: var(--spacing-md);
+      }
+
+      .controls-hint {
+        display: none;
+      }
+    }
+
+    /* Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Card Drive & Drift</div>
+      <div class="loading-progress">Initializing Physics Engine...</div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu">
+      <div class="menu-header">
+        <h1 class="game-title">Card Drive</h1>
+        <p class="game-subtitle">& Drift</p>
+      </div>
+      <div class="menu-content">
+        <button class="menu-button primary" data-action="start-race">Start Race</button>
+        <button class="menu-button secondary" data-action="custom-drift">Custom Drift</button>
+        <div class="menu-divider"></div>
+        <button class="menu-button" data-action="settings">Settings</button>
+        <button class="menu-button" data-action="about">About</button>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="ui-layer hud-top">
+        <div class="lap-counter">
+          <span id="lap-current">1</span>/<span id="lap-total">3</span>
+        </div>
+        <div class="timer" id="race-timer">00:00.000</div>
+      </div>
+      <div class="ui-layer hud-bottom">
+        <div class="drift-meter">
+          <div class="drift-label">Drift</div>
+          <div class="drift-bar-container">
+            <div class="drift-bar" id="drift-bar"></div>
+          </div>
+          <div class="drift-score" id="drift-score">0</div>
+        </div>
+        <div class="speedometer">
+          <div class="speed-value" id="speed-value">0</div>
+          <div class="speed-unit">km/h</div>
+          <div class="gear-indicator" id="gear-indicator">N</div>
+        </div>
+        <div class="controls-hint">
+          <div class="control-row">
+            <span class="control-key">↑</span>
+            <span class="control-key">↓</span>
+            <span class="control-key">←</span>
+            <span class="control-key">→</span>
+          </div>
+          <div style="margin-top: 8px;">Accelerate / Brake</div>
+          <div style="margin-top: 4px;">Steer Left / Right</div>
+          <div class="control-row" style="margin-top: 12px;">
+            <span class="control-key">SPACE</span>
+            <span class="control-key">SHIFT</span>
+          </div>
+          <div style="margin-top: 8px;">Handbrake / Turbo</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu">
+      <div class="pause-title">Paused</div>
+      <div class="menu-content">
+        <button class="menu-button primary" data-action="resume">Resume</button>
+        <button class="menu-button secondary" data-action="restart">Restart</button>
+        <div class="menu-divider"></div>
+        <button class="menu-button" data-action="quit-to-menu">Main Menu</button>
+      </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="results-screen">
+      <div class="rank-badge rank-gold" id="rank-badge">S</div>
+      <div class="results-title">Race Complete!</div>
+      <div class="results-stats">
+        <div class="stat-item">
+          <span class="stat-label">Final Time</span>
+          <span class="stat-value highlight" id="final-time">--:--.---</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Top Speed</span>
+          <span class="stat-value" id="top-speed">0 km/h</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Drift Score</span>
+          <span class="stat-value highlight" id="final-drift">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Laps</span>
+          <span class="stat-value" id="laps-completed">0/0</span>
+        </div>
+      </div>
+      <div class="menu-content">
+        <button class="menu-button primary" data-action="play-again">Play Again</button>
+        <button class="menu-button secondary" data-action="to-menu">Main Menu</button>
+      </div>
+    </div>
+
+    <!-- Tutorial Overlay -->
+    <div id="tutorial-overlay">
+      <div class="tutorial-step active" data-step="1">
+        <div class="tutorial-icon">🚗</div>
+        <h3 class="tutorial-title">Welcome to Card Drive & Drift!</h3>
+        <p class="tutorial-description">Master the art of high-performance driving and precision drifting in this physics-based racing experience.</p>
+        <div class="tutorial-controls">
+          <button class="tutorial-btn" data-action="next-tutorial">Next</button>
+        </div>
+      </div>
+      <div class="tutorial-step" data-step="2">
+        <div class="tutorial-icon">⌨️</div>
+        <h3 class="tutorial-title">Controls</h3>
+        <p class="tutorial-description">Use Arrow Keys or WASD to drive. SPACE for handbrake, SHIFT for turbo boost. Master the balance between grip and slide!</p>
+        <div class="tutorial-controls">
+          <button class="tutorial-btn" data-action="prev-tutorial">Back</button>
+          <button class="tutorial-btn" data-action="next-tutorial">Next</button>
+        </div>
+      </div>
+      <div class="tutorial-step" data-step="3">
+        <div class="tutorial-icon">🎯</div>
+        <h3 class="tutorial-title">Drifting Mechanics</h3>
+        <p class="tutorial-description">Initiate drifts by hitting the handbrake mid-corner. Maintain the angle while steering into the turn. Perfect your technique for maximum points!</p>
+        <div class="tutorial-controls">
+          <button class="tutorial-btn" data-action="prev-tutorial">Back</button>
+          <button class="tutorial-btn" data-action="start-game">Let's Go!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { Engine } from './engine/Engine.js';
+    import { InputManager } from './engine/InputManager.js';
+    import { EntityManager } from './engine/EntityManager.js';
+    import { SceneManager } from './engine/SceneManager.js';
+    import { PhysicsEngine } from './physics/PhysicsEngine.js';
+    import { VehiclePhysics } from './physics/VehiclePhysics.js';
+    import { MathUtils } from './physics/MathUtils.js';
+
+    // Game constants
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
+    const TARGET_FPS = 60;
+    const FIXED_TIMESTEP = 1 / TARGET_FPS;
+
+    // DOM elements
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const loadingScreen = document.getElementById('loading-screen');
+    const mainMenu = document.getElementById('main-menu');
+    const hud = document.getElementById('hud');
+    const pauseMenu = document.getElementById('pause-menu');
+    const resultsScreen = document.getElementById('results-screen');
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+
+    // HUD elements
+    const lapCurrentEl = document.getElementById('lap-current');
+    const lapTotalEl = document.getElementById('lap-total');
+    const raceTimerEl = document.getElementById('race-timer');
+    const speedValueEl = document.getElementById('speed-value');
+    const gearIndicatorEl = document.getElementById('gear-indicator');
+    const driftBarEl = document.getElementById('drift-bar');
+    const driftScoreEl = document.getElementById('drift-score');
+    const finalTimeEl = document.getElementById('final-time');
+    const topSpeedEl = document.getElementById('top-speed');
+    const finalDriftEl = document.getElementById('final-drift');
+    const lapsCompletedEl = document.getElementById('laps-completed');
+    const rankBadgeEl = document.getElementById('rank-badge');
+
+    // Game state
+    let gameState = {
+      isRunning: false,
+      isPaused: false,
+      currentScene: 'menu',
+      lastTime: 0,
+      accumulator: 0,
+      frameCount: 0,
+      fps: 0
+    };
+
+    // System instances
+    let engine = null;
+    let inputManager = null;
+    let entityManager = null;
+    let sceneManager = null;
+    let physicsEngine = null;
+    let vehiclePhysics = null;
+
+    // Initialize game
+    async function init() {
+      try {
+        // Set canvas resolution
+        resizeCanvas();
+        
+        // Initialize systems
+        inputManager = new InputManager();
+        physicsEngine = new PhysicsEngine();
+        vehiclePhysics = new VehiclePhysics(physicsEngine);
+        entityManager = new EntityManager(vehiclePhysics);
+        sceneManager = new SceneManager(entityManager);
+        engine = new Engine(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, physicsEngine, entityManager, sceneManager);
+
+        // Setup input handlers
+        setupInputHandlers();
+        
+        // Initial render
+        render();
+        
+        // Start game loop
+        requestAnimationFrame(gameLoop);
+        
+        // Hide loading screen after brief delay
+        setTimeout(() => {
+          loadingScreen.classList.add('hidden');
+        }, 1500);
+
+      } catch (error) {
+        console.error('Failed to initialize game:', error);
+        showError(error.message);
+      }
+    }
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = CANVAS_WIDTH * dpr;
+      canvas.height = CANVAS_HEIGHT * dpr;
+      canvas.style.width = '100vw';
+      canvas.style.height = '100vh';
+      ctx.scale(dpr, dpr);
+    }
+
+    function setupInputHandlers() {
+      // Window events
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+      });
+
+      // UI button handlers
+      document.querySelectorAll('[data-action]').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const action = e.target.dataset.action;
+          handleAction(action);
+        });
+
+        // Keyboard shortcut support
+        button.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const action = e.target.dataset.action;
+            handleAction(action);
+          }
+        });
+      });
+
+      // Global keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (gameState.isRunning && !gameState.isPaused) {
+            togglePause();
+          } else if (gameState.isPaused) {
+            togglePause();
+          }
+        }
+      });
+    }
+
+    function handleAction(action) {
+      switch (action) {
+        case 'start-race':
+          startGame('race');
+          break;
+        case 'custom-drift':
+          startGame('drift');
+          break;
+        case 'settings':
+          openSettings();
+          break;
+        case 'about':
+          openAbout();
+          break;
+        case 'resume':
+          togglePause(false);
+          break;
+        case 'restart':
+          restartGame();
+          break;
+        case 'quit-to-menu':
+          quitToMenu();
+          break;
+        case 'play-again':
+          startGame('race');
+          break;
+        case 'to-menu':
+          quitToMenu();
+          break;
+        case 'next-tutorial':
+          nextTutorialStep();
+          break;
+        case 'prev-tutorial':
+          prevTutorialStep();
+          break;
+        case 'start-game':
+          hideTutorial();
+          startGame('race');
+          break;
+      }
+    }
+
+    function startGame(mode) {
+      gameState.currentScene = mode;
+      
+      // Hide menu/tutorial, show HUD
+      mainMenu.classList.add('hidden');
+      tutorialOverlay.classList.remove('active');
+      pauseMenu.classList.remove('visible');
+      resultsScreen.classList.remove('visible');
+      hud.classList.add('visible');
+
+      // Reset game state
+      gameState.isRunning = true;
+      gameState.isPaused = false;
+      gameState.lastTime = performance.now();
+      gameState.accumulator = 0;
+
+      // Initialize entities
+      entityManager.reset();
+      
+      // Start physics simulation
+      physicsEngine.start();
+      
+      // Begin race
+      sceneManager.beginRace(mode);
+    }
+
+    function togglePause(forceState = null) {
+      if (!gameState.isRunning) return;
+
+      const newState = forceState !== null ? forceState : !gameState.isPaused;
+      gameState.isPaused = newState;
+
+      if (newState) {
+        pauseMenu.classList.add('visible');
+        physicsEngine.pause();
+      } else {
+        pauseMenu.classList.remove('visible');
+        gameState.lastTime = performance.now();
+        gameState.accumulator = 0;
+        physicsEngine.resume();
+      }
+    }
+
+    function restartGame() {
+      togglePause(false);
+      startGame(gameState.currentScene);
+    }
+
+    function quitToMenu() {
+      gameState.isRunning = false;
+      physicsEngine.stop();
+      
+      hud.classList.remove('visible');
+      pauseMenu.classList.remove('visible');
+      resultsScreen.classList.remove('visible');
+      mainMenu.classList.remove('hidden');
+      
+      // Reset entity manager
+      entityManager.reset();
+    }
+
+    function endGame(results) {
+      gameState.isRunning = false;
+      physicsEngine.stop();
+      
+      hud.classList.remove('visible');
+      resultsScreen.classList.add('visible');
+      
+      // Populate results
+      finalTimeEl.textContent = formatTime(results.time);
+      topSpeedEl.textContent = `${Math.round(results.topSpeed)} km/h`;
+      finalDriftEl.textContent = results.driftScore.toLocaleString();
+      lapsCompletedEl.textContent = `${results.laps}/${results.totalLaps}`;
+      
+      // Set rank badge
+      rankBadgeEl.className = 'rank-badge';
+      if (results.rank === 'gold') {
+        rankBadgeEl.classList.add('rank-gold');
+        rankBadgeEl.textContent = 'A';
+      } else if (results.rank === 'silver') {
+        rankBadgeEl.classList.add('rank-silver');
+        rankBadgeEl.textContent = 'B';
+      } else if (results.rank === 'bronze') {
+        rankBadgeEl.classList.add('rank-bronze');
+        rankBadgeEl.textContent = 'C';
+      } else {
+        rankBadgeEl.classList.add('rank-none');
+        rankBadgeEl.textContent = 'F';
+      }
+    }
+
+    function formatTime(ms) {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      const milliseconds = Math.floor(ms % 1000);
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+    }
+
+    function updateHUD(dt) {
+      const vehicle = entityManager.getVehicle();
+      if (!vehicle) return;
+
+      // Update speed
+      speedValueEl.textContent = Math.round(vehicle.speedKmh);
+      
+      // Update gear
+      gearIndicatorEl.textContent = vehicle.gear;
+      
+      // Update drift
+      driftBarEl.style.height = `${Math.min(100, vehicle.driftAngle * 5)}%`;
+      driftScoreEl.textContent = Math.round(vehicle.driftScore);
+      
+      // Update timer
+      if (gameState.isRunning && !gameState.isPaused) {
+        raceTimerEl.textContent = formatTime(sceneManager.raceTime);
+      }
+      
+      // Update laps
+      lapCurrentEl.textContent = sceneManager.currentLap;
+      lapTotalEl.textContent = sceneManager.totalLaps;
+    }
+
+    function gameLoop(timestamp) {
+      if (!gameState.isRunning) {
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      const dt = (timestamp - gameState.lastTime) / 1000;
+      gameState.lastTime = timestamp;
+      
+      if (dt > 0.1) {
+        gameState.lastTime = timestamp;
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      gameState.accumulator += dt;
+
+      while (gameState.accumulator >= FIXED_TIMESTEP) {
+        update(FIXED_TIMESTEP);
+        gameState.accumulator -= FIXED_TIMESTEP;
+      }
+
+      const interpolation = gameState.accumulator / FIXED_TIMESTEP;
+      render(interpolation);
+
+      gameState.frameCount++;
+      if (timestamp % 1000 < 16) {
+        gameState.fps = gameState.frameCount;
+        gameState.frameCount = 0;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+      if (gameState.isPaused) return;
+
+      // Update physics
+      physicsEngine.update(dt);
+      
+      // Update input
+      inputManager.update();
+      
+      // Update entities
+      entityManager.update(dt);
+      
+      // Update scene
+      sceneManager.update(dt);
+      
+      // Check game completion
+      if (sceneManager.isRaceComplete) {
+        const results = sceneManager.getResults();
+        endGame(results);
+        return;
+      }
+      
+      // Update HUD
+      updateHUD(dt);
+    }
+
+    function render(interpolation = 0) {
+      // Clear canvas
+      ctx.fillStyle = '#0a0a12';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Render scene
+      if (engine) {
+        engine.render(interpolation);
+      }
+    }
+
+    function openSettings() {
+      alert('Settings panel not yet implemented');
+    }
+
+    function openAbout() {
+      alert('Card Drive & Drift v1.0.0\n\nAdvanced Physics Racing Game\n© 2026 All Rights Reserved');
+    }
+
+    function showError(message) {
+      loadingScreen.innerHTML = `
+        <div style="text-align: center;">
+          <div style="color: var(--color-danger); font-size: 2rem; margin-bottom: 1rem;">Error</div>
+          <div style="color: var(--color-gray);">${message}</div>
+          <button class="menu-button primary" onclick="location.reload()" style="margin-top: 2rem;">Retry</button>
+        </div>
+      `;
+    }
+
+    function nextTutorialStep() {
+      const currentStep = parseInt(tutorialOverlay.querySelector('.tutorial-step.active').dataset.step);
+      const nextStep = currentStep + 1;
+      const steps = tutorialOverlay.querySelectorAll('.tutorial-step');
+      
+      if (nextStep <= steps.length) {
+        tutorialOverlay.querySelector(`[data-step="${currentStep}"]`).classList.remove('active');
+        tutorialOverlay.querySelector(`[data-step="${nextStep}"]`).classList.add('active');
+      }
+    }
+
+    function prevTutorialStep() {
+      const currentStep = parseInt(tutorialOverlay.querySelector('.tutorial-step.active').dataset.step);
+      const prevStep = currentStep - 1;
+      
+      if (prevStep >= 1) {
+        tutorialOverlay.querySelector(`[data-step="${currentStep}"]`).classList.remove('active');
+        tutorialOverlay.querySelector(`[data-step="${prevStep}"]`).classList.add('active');
+      }
+    }
+
+    function hideTutorial() {
+      tutorialOverlay.style.display = 'none';
+    }
+
+    // Start the game
+    init();
+  </script>
+</body>
+</html>
