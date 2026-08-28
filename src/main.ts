@@ -88,25 +88,24 @@ class CardDriveDrift {
           break;
         case 'ArrowDown':
         case 'KeyS':
-          this.vehicle?.applyAcceleration(-80);
+          this.vehicle?.applyBrake(100);
           break;
         case 'ArrowLeft':
         case 'KeyA':
-          this.vehicle?.steerLeft();
+          this.vehicle?.turnLeft();
           break;
         case 'ArrowRight':
         case 'KeyD':
-          this.vehicle?.steerRight();
+          this.vehicle?.turnRight();
           break;
         case 'Space':
-          this.vehicle?.brake();
-          break;
-        case 'ShiftLeft':
-        case 'ShiftRight':
-          this.vehicle?.boost();
+          this.vehicle?.jump();
           break;
         case 'KeyR':
-          this.restartLevel();
+          this.restartGame();
+          break;
+        case 'Escape':
+          this.togglePause();
           break;
       }
     });
@@ -115,170 +114,150 @@ class CardDriveDrift {
       switch (key) {
         case 'ArrowUp':
         case 'KeyW':
+          this.vehicle?.releaseAcceleration();
+          break;
         case 'ArrowDown':
         case 'KeyS':
-          this.vehicle?.releaseThrottle();
+          this.vehicle?.releaseBrake();
           break;
         case 'ArrowLeft':
         case 'KeyA':
         case 'ArrowRight':
         case 'KeyD':
-          this.vehicle?.centerSteering();
-          break;
-        case 'Space':
-          this.vehicle?.releaseBrake();
-          break;
-        case 'ShiftLeft':
-        case 'ShiftRight':
-          this.vehicle?.releaseBoost();
+          this.vehicle?.stopTurning();
           break;
       }
     });
 
-    this.input.on('mousedown', () => {
-      this.vehicle?.brake();
-    });
+    // Touch controls for mobile
+    this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+    this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+    this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+  }
 
-    this.input.on('mouseup', () => {
-      this.vehicle?.releaseBrake();
-    });
+  private handleTouchStart(e: TouchEvent): void {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = this.canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+    
+    if (x < centerX && y > centerY) {
+      this.vehicle?.turnLeft();
+    } else if (x > centerX && y > centerY) {
+      this.vehicle?.turnRight();
+    }
+    
+    if (y < centerY) {
+      this.vehicle?.applyAcceleration(150);
+    }
+  }
 
-    this.input.on('touchstart', () => {
-      this.vehicle?.brake();
-    });
+  private handleTouchMove(e: TouchEvent): void {
+    e.preventDefault();
+  }
 
-    this.input.on('touchend', () => {
-      this.vehicle?.releaseBrake();
-    });
-
-    window.addEventListener('resize', () => {
-      const width = Math.min(window.innerWidth, window.innerHeight * 1.77);
-      const height = Math.min(window.innerHeight, window.innerWidth / 1.77);
-      
-      this.canvas.width = width;
-      this.canvas.height = height;
-      this.renderer.setResolution(width, height);
-    });
+  private handleTouchEnd(e: TouchEvent): void {
+    e.preventDefault();
+    this.vehicle?.stopTurning();
+    this.vehicle?.releaseAcceleration();
   }
 
   private createLevel(): void {
-    this.vehicle = new CardVehicle(100, 300, this.physics);
-    this.entityMgr.addEntity(this.vehicle);
-
-    const startX = 100;
-    const startY = 350;
-    const segmentWidth = 400;
-    const segmentHeight = 60;
+    const segments: TrackSegment[] = [];
+    let x = 100;
+    let y = this.canvas.height - 200;
     
-    let y = startY;
+    // Create track segments with varying heights
     for (let i = 0; i < 50; i++) {
-      const track = new TrackSegment(startX + (i * segmentWidth), y, segmentWidth, segmentHeight);
-      this.entityMgr.addEntity(track);
+      const segmentHeight = 40 + Math.random() * 60;
+      const segmentWidth = 200 + Math.random() * 100;
       
-      const noise = Math.sin(i * 0.5) * 30 + Math.cos(i * 0.3) * 20;
-      y += noise;
+      segments.push(new TrackSegment(x, y, segmentWidth, segmentHeight));
       
-      if (i % 8 === 0 && i > 0) {
-        const gapY = y - 150 - Math.abs(noise);
-        const gapTrack = new TrackSegment(startX + (i * segmentWidth), gapY, segmentWidth, segmentHeight);
-        this.entityMgr.addEntity(gapTrack);
-        
-        const coinY = gapY - 50;
-        const coin = new Particle(startX + (i * segmentWidth) + segmentWidth / 2, coinY, 'coin');
-        this.entityMgr.addEntity(coin);
-      }
-      
-      if (i % 15 === 0 && i > 0) {
-        const obstacleY = y - 100;
-        const obstacle = new Particle(startX + (i * segmentWidth) + segmentWidth / 2, obstacleY, 'obstacle');
-        this.entityMgr.addEntity(obstacle);
-      }
+      x += segmentWidth + 50 + Math.random() * 50;
+      y = Math.max(200, Math.min(this.canvas.height - 150, y + (Math.random() - 0.5) * 100));
     }
     
-    const finishLine = new TrackSegment(startX + (50 * segmentWidth), y, segmentWidth, segmentHeight, true);
-    this.entityMgr.addEntity(finishLine);
+    this.sceneMgr.addTrackSegments(segments);
     
-    const camera = new Camera(this.canvas.width, this.canvas.height);
+    // Create player vehicle
+    this.vehicle = new CardVehicle(this.canvas.width / 2, this.canvas.height - 300);
+    this.entityMgr.addEntity(this.vehicle);
+    
+    // Create particles
+    for (let i = 0; i < 20; i++) {
+      this.entityMgr.addEntity(new Particle(
+        Math.random() * this.canvas.width,
+        Math.random() * this.canvas.height,
+        10 + Math.random() * 20,
+        Math.random() * 2 + 1
+      ));
+    }
+    
+    // Create camera
+    const camera = new Camera();
     this.entityMgr.addEntity(camera);
-    
-    this.sceneMgr.setCurrentScene('race');
   }
 
-  private restartLevel(): void {
-    this.entityMgr.clear();
+  private restartGame(): void {
+    this.entityMgr.clearEntities();
+    this.sceneMgr.clearTrackSegments();
     this.createLevel();
+    this.lastTime = performance.now();
   }
 
-  private gameLoop(currentTime: number): void {
-    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.05);
-    this.lastTime = currentTime;
-    
-    this.update(deltaTime);
-    this.render();
-    
-    this.animationId = requestAnimationFrame(this.gameLoop);
-  }
-
-  private update(deltaTime: number): void {
-    this.input.update(deltaTime);
-    this.physics.update(deltaTime);
-    this.engine.update(deltaTime);
-    
-    const entities = this.entityMgr.getEntities();
-    entities.forEach(entity => {
-      entity.update(deltaTime);
-    });
-    
-    if (this.vehicle && this.physics) {
-      this.physics.applyToEntity(this.vehicle);
-    }
-    
-    const camera = this.entityMgr.getEntityByType<Camera>('Camera');
-    if (camera && this.vehicle) {
-      camera.updateTarget(this.vehicle);
-    }
-    
-    if (this.vehicle?.isFinished()) {
-      this.audio.playSound('win');
-      setTimeout(() => {
-        alert('Level Complete! Press R to restart.');
-        this.restartLevel();
-      }, 1000);
-    }
-  }
-
-  private render(): void {
-    this.renderer.clear();
-    
-    const entities = this.entityMgr.getEntities();
-    const sortedEntities = [...entities].sort((a, b) => a.zIndex - b.zIndex);
-    
-    sortedEntities.forEach(entity => {
-      entity.render(this.renderer.context);
-    });
-    
-    this.renderer.renderUI();
-  }
-
-  startGame(): void {
-    this.animationId = requestAnimationFrame(this.gameLoop);
-  }
-
-  stopGame(): void {
+  private togglePause(): void {
     if (this.animationId !== null) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
+    } else {
+      this.lastTime = performance.now();
+      this.animationId = requestAnimationFrame(this.gameLoop);
     }
   }
 
-  getAudio(): AudioSystem {
+  private gameLoop(timestamp: number): void {
+    if (this.animationId === null) return;
+    
+    const deltaTime = (timestamp - this.lastTime) / 1000;
+    this.lastTime = timestamp;
+    
+    // Cap delta time to prevent physics explosions
+    const cappedDelta = Math.min(deltaTime, 0.05);
+    
+    this.engine.update(cappedDelta);
+    this.renderer.render();
+    
+    this.animationId = requestAnimationFrame(this.gameLoop);
+  }
+
+  public getEngine(): Engine {
+    return this.engine;
+  }
+
+  public getInput(): InputManager {
+    return this.input;
+  }
+
+  public getAudio(): AudioSystem {
     return this.audio;
+  }
+
+  public getRenderer(): RenderSystem {
+    return this.renderer;
   }
 }
 
-const app = new CardDriveDrift();
-window.__cardDriveDrift = app;
+// Start the game
+const cardDriveDrift = new CardDriveDrift();
+window.__cardDriveDrift = cardDriveDrift;
 
-app.init().then(() => {
-  app.startGame();
+cardDriveDrift.init().then(() => {
+  console.log('Card Drive & Drift initialized');
+}).catch((error) => {
+  console.error('Failed to initialize:', error);
 });
