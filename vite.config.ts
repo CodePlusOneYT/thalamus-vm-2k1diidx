@@ -1,45 +1,103 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   root: '.',
   publicDir: 'public',
+  
+  // Build configuration
   build: {
     outDir: 'dist',
+    assetsDir: 'assets',
     sourcemap: true,
     minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
       output: {
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/[name]-[hash].js`,
+        assetFileNames: `assets/[name]-[hash].[ext]`,
         manualChunks: {
-          engine: ['src/engine/Engine.ts', 'src/engine/InputManager.ts', 'src/engine/EntityManager.ts', 'src/engine/SceneManager.ts'],
-          physics: ['src/physics/PhysicsEngine.ts', 'src/physics/VehiclePhysics.ts', 'src/physics/CollisionSystem.ts', 'src/physics/DriftController.ts'],
-          entities: ['src/entities/Entity.ts', 'src/entities/CardVehicle.ts', 'src/entities/TrackSegment.ts', 'src/entities/Particle.ts', 'src/entities/Camera.ts'],
-          cards: ['src/cards/Card.ts', 'src/cards/CardCollection.ts', 'src/cards/CardUpgrade.ts', 'src/cards/CardRenderer.ts'],
-          tracks: ['src/tracks/TrackGenerator.ts', 'src/tracks/TrackRenderer.ts', 'src/tracks/CheckpointSystem.ts'],
-          audio: ['src/audio/AudioEngine.ts', 'src/audio/EngineSound.ts', 'src/audio/TireSqueal.ts', 'src/audio/ImpactSound.ts'],
-          ui: ['src/ui/HUD.ts', 'src/ui/Garage.ts', 'src/ui/Menus.ts', 'src/ui/Settings.ts'],
-          modes: ['src/modes/TimeAttack.ts', 'src/modes/DriftChallenge.ts', 'src/modes/Career.ts', 'src/modes/FreeRoam.ts'],
-          save: ['src/save/SaveManager.ts', 'src/save/SettingsManager.ts'],
+          vendor: ['zod'],
+          engine: [
+            'src/engine/Engine.ts',
+            'src/engine/InputManager.ts',
+            'src/engine/EntityManager.ts',
+            'src/engine/SceneManager.ts',
+          ],
+          physics: [
+            'src/physics/PhysicsEngine.ts',
+            'src/physics/VehiclePhysics.ts',
+            'src/physics/CollisionSystem.ts',
+            'src/physics/DriftController.ts',
+            'src/physics/MathUtils.ts',
+          ],
+          entities: [
+            'src/entities/Entity.ts',
+            'src/entities/CardVehicle.ts',
+            'src/entities/TrackSegment.ts',
+            'src/entities/Particle.ts',
+            'src/entities/Camera.ts',
+          ],
+          audio: [
+            'src/audio/AudioSystem.ts',
+            'src/audio/AudioController.ts',
+          ],
+          systems: [
+            'src/systems/CardDeck.ts',
+          ],
         },
       },
     },
+    terserOptions: {
+      compress: {
+        drop_console: !process.env.VITE_DEBUG_MODE || process.env.VITE_DEBUG_MODE === 'false',
+        drop_debugger: true,
+        passes: 2,
+        pure_funcs: ['console.log', 'console.debug', 'console.trace'],
+      },
+      mangle: {
+        reserved: ['$super', '$this'],
+      },
+      format: {
+        comments: false,
+      },
+    },
+    target: 'esnext',
+    cssTarget: 'esnext',
+    chunkSizeWarningLimit: 500,
   },
+  
+  // Development server configuration
   server: {
-    port: 3000,
     host: '0.0.0.0',
-    open: true,
+    port: parseInt(process.env.VITE_PORT || '3000', 10),
+    strictPort: true,
+    proxy: {},
+    watch: {
+      usePolling: false,
+    },
   },
-  preview: {
-    port: 3000,
-    host: '0.0.0.0',
+  
+  // CSS handling
+  css: {
+    modules: {
+      generateScopedName: '[local]-[hash:base64:5]',
+    },
   },
-  esbuild: {
-    target: 'ES2022',
-    treeShaking: true,
+  
+  // Resolve aliases
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
   },
+  
+  // Preload files
+  preload: true,
+  
+  // Base URL
+  base: '/',
 });
