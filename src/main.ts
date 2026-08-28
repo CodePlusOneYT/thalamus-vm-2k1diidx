@@ -26,399 +26,259 @@ class CardDriveDrift {
   private renderer: RenderSystem;
   private audio: AudioSystem;
   private physics: PhysicsEngine;
-  private driftController: DriftController;
-  private collisionSystem: CollisionSystem;
-  private camera: Camera;
-  private player: CardVehicle | null = null;
-  private track: TrackSegment[] = [];
-  private particles: Particle[] = [];
-  private score: number = 0;
-  private speed: number = 0;
-  private maxSpeed: number = 15;
-  private time: number = 0;
-  private gameState: 'menu' | 'playing' | 'gameover' = 'menu';
+  private vehicle: CardVehicle | null = null;
   private lastTime: number = 0;
+  private animationId: number | null = null;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
 
   constructor() {
-    const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+    this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+    this.ctx = this.canvas.getContext('2d')!;
     
-    if (!canvas) {
-      throw new Error('Canvas element not found');
-    }
-
+    // Initialize systems
     this.input = new InputManager();
     this.audio = new AudioSystem();
-    
-    this.renderer = new RenderSystem(canvas);
-    this.sceneMgr = new SceneManager(this.renderer);
-    this.entityMgr = new EntityManager();
     this.physics = new PhysicsEngine();
-    this.driftController = new DriftController();
-    this.collisionSystem = new CollisionSystem();
-    this.camera = new Camera();
-
-    this.engine = new Engine(
-      () => this.update(),
-      () => this.render(),
-      () => this.handleInput(),
-      this.renderer.getCanvas().width,
-      this.renderer.getCanvas().height
-    );
-
-    window.addEventListener('resize', () => this.onResize());
+    this.renderer = new RenderSystem(this.canvas, this.ctx);
+    this.entityMgr = new EntityManager();
+    this.sceneMgr = new SceneManager(this.entityMgr);
+    this.engine = new Engine(this.input, this.physics, this.renderer, this.entityMgr, this.sceneMgr);
     
-    // Initialize game state
-    this.init();
+    // Bind methods
+    this.init = this.init.bind(this);
+    this.gameLoop = this.gameLoop.bind(this);
   }
 
-  private init(): void {
-    console.log('[CardDriveDrift] Initializing...');
-    
-    // Resume audio context on first interaction
-    const resumeAudio = () => {
-      this.audio.resume();
-      document.removeEventListener('click', resumeAudio);
-      document.removeEventListener('keydown', resumeAudio);
-    };
-    document.addEventListener('click', resumeAudio);
-    document.addEventListener('keydown', resumeAudio);
+  async init(): Promise<void> {
+    return new Promise((resolve) => {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.start(resolve));
+      } else {
+        this.start(resolve);
+      }
+    });
+  }
 
-    // Setup initial track
-    this.setupTrack();
+  private start(resolve: () => void): void {
+    const width = Math.min(window.innerWidth, window.innerHeight * 1.77);
+    const height = Math.min(window.innerHeight, window.innerWidth / 1.77);
     
-    // Create player vehicle
-    this.player = new CardVehicle(100, 300);
-    this.player.setVelocity(0, 0);
-    this.player.setMaxSpeed(this.maxSpeed);
+    this.canvas.width = width;
+    this.canvas.height = height;
     
-    this.entityMgr.addEntity(this.player);
+    this.renderer.setResolution(width, height);
     
-    // Start engine loop
-    this.engine.start();
+    this.setupInputHandlers();
+    this.createLevel();
+    
+    this.audio.init();
+    
     this.lastTime = performance.now();
     
-    console.log('[CardDriveDrift] Ready!');
+    resolve();
   }
 
-  private setupTrack(): void {
-    // Generate track segments
-    const segmentWidth = 200;
-    const segmentCount = 50;
-    let currentY = 0;
+  private setupInputHandlers(): void {
+    this.input.on('keydown', (key: string) => {
+      switch (key) {
+        case 'ArrowUp':
+        case 'KeyW':
+          this.vehicle?.applyAcceleration(150);
+          break;
+        case 'ArrowDown':
+        case 'KeyS':
+          this.vehicle?.applyAcceleration(-80);
+          break;
+        case 'ArrowLeft':
+        case 'KeyA':
+          this.vehicle?.steerLeft();
+          break;
+        case 'ArrowRight':
+        case 'KeyD':
+          this.vehicle?.steerRight();
+          break;
+        case 'Space':
+          this.vehicle?.brake();
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          this.vehicle?.boost();
+          break;
+        case 'KeyR':
+          this.restartLevel();
+          break;
+      }
+    });
+
+    this.input.on('keyup', (key: string) => {
+      switch (key) {
+        case 'ArrowUp':
+        case 'KeyW':
+        case 'ArrowDown':
+        case 'KeyS':
+          this.vehicle?.releaseThrottle();
+          break;
+        case 'ArrowLeft':
+        case 'KeyA':
+        case 'ArrowRight':
+        case 'KeyD':
+          this.vehicle?.centerSteering();
+          break;
+        case 'Space':
+          this.vehicle?.releaseBrake();
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          this.vehicle?.releaseBoost();
+          break;
+      }
+    });
+
+    this.input.on('mousedown', () => {
+      this.vehicle?.brake();
+    });
+
+    this.input.on('mouseup', () => {
+      this.vehicle?.releaseBrake();
+    });
+
+    this.input.on('touchstart', () => {
+      this.vehicle?.brake();
+    });
+
+    this.input.on('touchend', () => {
+      this.vehicle?.releaseBrake();
+    });
+
+    window.addEventListener('resize', () => {
+      const width = Math.min(window.innerWidth, window.innerHeight * 1.77);
+      const height = Math.min(window.innerHeight, window.innerWidth / 1.77);
+      
+      this.canvas.width = width;
+      this.canvas.height = height;
+      this.renderer.setResolution(width, height);
+    });
+  }
+
+  private createLevel(): void {
+    this.vehicle = new CardVehicle(100, 300, this.physics);
+    this.entityMgr.addEntity(this.vehicle);
+
+    const startX = 100;
+    const startY = 350;
+    const segmentWidth = 400;
+    const segmentHeight = 60;
     
-    for (let i = 0; i < segmentCount; i++) {
-      const heightVariation = Math.sin(i * 0.3) * 50;
-      const widthVariation = Math.cos(i * 0.2) * 80;
+    let y = startY;
+    for (let i = 0; i < 50; i++) {
+      const track = new TrackSegment(startX + (i * segmentWidth), y, segmentWidth, segmentHeight);
+      this.entityMgr.addEntity(track);
       
-      const segment = new TrackSegment(
-        currentY - widthVariation / 2,
-        currentY + heightVariation,
-        segmentWidth,
-        100 + i * 2,
-        i % 5 === 0 ? 'straight' : 'curve'
-      );
+      const noise = Math.sin(i * 0.5) * 30 + Math.cos(i * 0.3) * 20;
+      y += noise;
       
-      this.track.push(segment);
-      this.entityMgr.addEntity(segment);
+      if (i % 8 === 0 && i > 0) {
+        const gapY = y - 150 - Math.abs(noise);
+        const gapTrack = new TrackSegment(startX + (i * segmentWidth), gapY, segmentWidth, segmentHeight);
+        this.entityMgr.addEntity(gapTrack);
+        
+        const coinY = gapY - 50;
+        const coin = new Particle(startX + (i * segmentWidth) + segmentWidth / 2, coinY, 'coin');
+        this.entityMgr.addEntity(coin);
+      }
       
-      currentY += 150;
+      if (i % 15 === 0 && i > 0) {
+        const obstacleY = y - 100;
+        const obstacle = new Particle(startX + (i * segmentWidth) + segmentWidth / 2, obstacleY, 'obstacle');
+        this.entityMgr.addEntity(obstacle);
+      }
     }
+    
+    const finishLine = new TrackSegment(startX + (50 * segmentWidth), y, segmentWidth, segmentHeight, true);
+    this.entityMgr.addEntity(finishLine);
+    
+    const camera = new Camera(this.canvas.width, this.canvas.height);
+    this.entityMgr.addEntity(camera);
+    
+    this.sceneMgr.setCurrentScene('race');
+  }
+
+  private restartLevel(): void {
+    this.entityMgr.clear();
+    this.createLevel();
+  }
+
+  private gameLoop(currentTime: number): void {
+    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.05);
+    this.lastTime = currentTime;
+    
+    this.update(deltaTime);
+    this.render();
+    
+    this.animationId = requestAnimationFrame(this.gameLoop);
   }
 
   private update(deltaTime: number): void {
-    this.time += deltaTime;
+    this.input.update(deltaTime);
+    this.physics.update(deltaTime);
+    this.engine.update(deltaTime);
     
-    if (this.gameState !== 'playing') return;
+    const entities = this.entityMgr.getEntities();
+    entities.forEach(entity => {
+      entity.update(deltaTime);
+    });
     
-    // Update player
-    if (this.player) {
-      const physicsResult = this.physics.update(this.player, deltaTime, this.track);
-      
-      if (physicsResult.onGround) {
-        this.speed = Math.min(this.speed + physicsResult.acceleration * deltaTime, this.maxSpeed);
-        this.player.setVelocity(this.speed * deltaTime, physicsResult.velocity.y);
-        
-        // Apply drift
-        this.driftController.update(this.player, deltaTime);
-        
-        // Spawn dust particles when moving fast
-        if (this.speed > 5 && Math.random() < 0.3) {
-          this.spawnParticle(this.player.x - 20, this.player.y + 20, 'dust');
-        }
-      } else {
-        this.speed *= 0.98; // Air resistance
-      }
-      
-      // Check collisions
-      const collision = this.collisionSystem.check(this.player, this.track);
-      if (collision) {
-        this.score += 10;
-        this.audio.playPickup();
-        this.spawnParticle(collision.x, collision.y, 'spark');
-        this.camera.shake(2);
-      }
+    if (this.vehicle && this.physics) {
+      this.physics.applyToEntity(this.vehicle);
     }
     
-    // Update camera
-    if (this.player) {
-      this.camera.update(this.player.x, this.player.y, this.renderer.getCanvas().width, this.renderer.getCanvas().height);
+    const camera = this.entityMgr.getEntityByType<Camera>('Camera');
+    if (camera && this.vehicle) {
+      camera.updateTarget(this.vehicle);
     }
     
-    // Update particles
-    this.particles = this.particles.filter(p => p.life > 0);
-    for (const particle of this.particles) {
-      particle.update(deltaTime);
-    }
-    
-    // Update game state
-    if (this.speed <= 0) {
-      this.gameState = 'gameover';
-      this.audio.playGameOver();
+    if (this.vehicle?.isFinished()) {
+      this.audio.playSound('win');
+      setTimeout(() => {
+        alert('Level Complete! Press R to restart.');
+        this.restartLevel();
+      }, 1000);
     }
   }
 
   private render(): void {
-    const ctx = this.renderer.getContext();
-    const canvas = this.renderer.getCanvas();
+    this.renderer.clear();
     
-    // Clear screen
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const entities = this.entityMgr.getEntities();
+    const sortedEntities = [...entities].sort((a, b) => a.zIndex - b.zIndex);
     
-    // Draw background parallax
-    this.drawBackground(ctx);
+    sortedEntities.forEach(entity => {
+      entity.render(this.renderer.context);
+    });
     
-    // Draw track
-    for (const segment of this.track) {
-      const worldPos = this.camera.toWorld(segment.x, segment.y);
-      this.drawTrackSegment(ctx, segment, worldPos);
-    }
-    
-    // Draw particles
-    for (const particle of this.particles) {
-      const worldPos = this.camera.toWorld(particle.x, particle.y);
-      this.drawParticle(ctx, particle, worldPos);
-    }
-    
-    // Draw player
-    if (this.player) {
-      const worldPos = this.camera.toWorld(this.player.x, this.player.y);
-      this.drawPlayer(ctx, this.player, worldPos);
-    }
-    
-    // Draw UI
-    this.drawUI(ctx, canvas.width, canvas.height);
+    this.renderer.renderUI();
   }
 
-  private drawBackground(ctx: CanvasRenderingContext2D): void {
-    // Simple gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 0, this.renderer.getCanvas().height);
-    gradient.addColorStop(0, '#0f0c29');
-    gradient.addColorStop(0.5, '#302b63');
-    gradient.addColorStop(1, '#24243e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, this.renderer.getCanvas().width, this.renderer.getCanvas().height);
+  startGame(): void {
+    this.animationId = requestAnimationFrame(this.gameLoop);
   }
 
-  private drawTrackSegment(ctx: CanvasRenderingContext2D, segment: TrackSegment, worldPos: {x: number, y: number}): void {
-    ctx.save();
-    
-    // Track color based on type
-    if (segment.type === 'curve') {
-      ctx.fillStyle = '#ff6b6b';
-    } else {
-      ctx.fillStyle = '#4ecdc4';
-    }
-    
-    // Draw track rectangle
-    ctx.fillRect(worldPos.x, worldPos.y, segment.width, segment.height);
-    
-    // Add track markings
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(worldPos.x + segment.width / 2, worldPos.y);
-    ctx.lineTo(worldPos.x + segment.width / 2, worldPos.y + segment.height);
-    ctx.stroke();
-    
-    ctx.restore();
-  }
-
-  private drawPlayer(ctx: CanvasRenderingContext2D, vehicle: CardVehicle, worldPos: {x: number, y: number}): void {
-    ctx.save();
-    ctx.translate(worldPos.x, worldPos.y);
-    
-    // Player body (card shape)
-    ctx.fillStyle = '#ffd700';
-    ctx.beginPath();
-    ctx.roundRect(-20, -30, 40, 60, 5);
-    ctx.fill();
-    
-    // Card details
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('A', 0, 5);
-    
-    // Wheels
-    ctx.fillStyle = '#333';
-    ctx.beginPath();
-    ctx.arc(-15, 25, 8, 0, Math.PI * 2);
-    ctx.arc(15, 25, 8, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Speed lines when going fast
-    if (this.speed > 10) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 3; i++) {
-        const offset = (i * 10) - 20;
-        ctx.beginPath();
-        ctx.moveTo(offset, 30);
-        ctx.lineTo(offset - 30, 30);
-        ctx.stroke();
-      }
-    }
-    
-    ctx.restore();
-  }
-
-  private drawParticle(ctx: CanvasRenderingContext2D, particle: Particle, worldPos: {x: number, y: number}): void {
-    ctx.save();
-    ctx.globalAlpha = particle.life / particle.maxLife;
-    
-    switch (particle.type) {
-      case 'dust':
-        ctx.fillStyle = '#8b7355';
-        ctx.beginPath();
-        ctx.arc(worldPos.x, worldPos.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      case 'spark':
-        ctx.fillStyle = '#ffaa00';
-        ctx.beginPath();
-        ctx.arc(worldPos.x, worldPos.y, 2, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-    }
-    
-    ctx.restore();
-  }
-
-  private drawUI(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    ctx.save();
-    ctx.font = 'bold 24px Arial';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
-    
-    // Score
-    ctx.fillText(`Score: ${this.score}`, 20, 40);
-    
-    // Speed
-    ctx.fillText(`Speed: ${Math.floor(this.speed)} km/h`, 20, 70);
-    
-    // Game state messages
-    switch (this.gameState) {
-      case 'menu':
-        ctx.font = 'bold 48px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('CARD DRIVE & DRIFT', width / 2, height / 2 - 50);
-        ctx.font = '24px Arial';
-        ctx.fillText('Press SPACE to start', width / 2, height / 2 + 20);
-        ctx.fillText('Arrow keys/WASD to drive', width / 2, height / 2 + 50);
-        break;
-      case 'gameover':
-        ctx.font = 'bold 48px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', width / 2, height / 2 - 50);
-        ctx.font = '24px Arial';
-        ctx.fillText(`Final Score: ${this.score}`, width / 2, height / 2);
-        ctx.fillText('Press R to restart', width / 2, height / 2 + 40);
-        break;
-    }
-    
-    ctx.restore();
-  }
-
-  private handleInput(): void {
-    if (this.gameState === 'menu') {
-      if (this.input.isKeyDown('Space')) {
-        this.gameState = 'playing';
-        this.score = 0;
-        this.speed = 0;
-        this.time = 0;
-        this.audio.playStart();
-      }
-      return;
-    }
-    
-    if (this.gameState === 'gameover') {
-      if (this.input.isKeyDown('r') || this.input.isKeyDown('R')) {
-        this.restartGame();
-      }
-      return;
-    }
-    
-    if (this.player) {
-      // Accelerate
-      if (this.input.isKeyDown('ArrowUp') || this.input.isKeyDown('w') || this.input.isKeyDown('W')) {
-        this.driftController.accelerate();
-      }
-      
-      // Brake
-      if (this.input.isKeyDown('ArrowDown') || this.input.isKeyDown('s') || this.input.isKeyDown('S')) {
-        this.driftController.brake();
-      }
-      
-      // Steer left
-      if (this.input.isKeyDown('ArrowLeft') || this.input.isKeyDown('a') || this.input.isKeyDown('A')) {
-        this.driftController.steerLeft();
-      }
-      
-      // Steer right
-      if (this.input.isKeyDown('ArrowRight') || this.input.isKeyDown('d') || this.input.isKeyDown('D')) {
-        this.driftController.steerRight();
-      }
+  stopGame(): void {
+    if (this.animationId !== null) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
     }
   }
 
-  private spawnParticle(x: number, y: number, type: 'dust' | 'spark'): void {
-    this.particles.push(new Particle(x, y, type));
-  }
-
-  private restartGame(): void {
-    this.gameState = 'playing';
-    this.score = 0;
-    this.speed = 0;
-    this.time = 0;
-    if (this.player) {
-      this.player.setVelocity(0, 0);
-      this.player.x = 100;
-      this.player.y = 300;
-    }
-    this.audio.playStart();
-  }
-
-  private onResize(): void {
-    const canvas = this.renderer.getCanvas();
-    const container = document.getElementById('gameContainer');
-    
-    if (container) {
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-    }
-    
-    this.engine.resize(canvas.width, canvas.height);
+  getAudio(): AudioSystem {
+    return this.audio;
   }
 }
 
-// Initialize game when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    const game = new CardDriveDrift();
-    window.__cardDriveDrift = game;
-    console.log('[CardDriveDrift] Game initialized successfully');
-  } catch (error) {
-    console.error('[CardDriveDrift] Initialization failed:', error);
-  }
+const app = new CardDriveDrift();
+window.__cardDriveDrift = app;
+
+app.init().then(() => {
+  app.startGame();
 });
