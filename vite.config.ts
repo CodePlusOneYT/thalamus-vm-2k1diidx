@@ -76,6 +76,7 @@ export default defineConfig({
         // JS chunks
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     
@@ -91,111 +92,259 @@ export default defineConfig({
     // Terser options for better compression
     terserOptions: {
       compress: {
-        drop_console: process.env.NODE_ENV === 'production',
-        drop_debugger: process.env.NODE_ENV === 'production',
-        pure_funcs: process.env.NODE_ENV === 'production' ? ['console.log', 'console.warn'] : [],
+        drop_console: false,
+        drop_debugger: false,
+        pure_funcs: [],
+        passes: 2,
       },
-      mangle: true,
+      mangle: {
+        safari10: true,
+      },
       format: {
         comments: false,
       },
     },
     
-    // Code splitting
-    codeSplitting: true,
-    
-    // Inline CSS into JS when small
+    // CSS code splitting
     cssCodeSplit: true,
     
-    // Chunk size warning limit (in KB)
-    chunkSizeWarningLimit: 500,
+    // Generate manifest for service worker
+    manifest: true,
     
-    // Rollup bundle config
-    lib: false,
+    // Chunk size warning limit (in KB)
+    chunkSizeWarningLimit: 1000,
+    
+    // Log build statistics
+    reportCompressedSize: true,
   },
   
-  // Development server settings
+  // Development server configuration
   server: {
-    // Host for external access
+    // Host binding
     host: '0.0.0.0',
     
-    // Port for development
+    // Port
     port: 3000,
     
-    // Open browser automatically
-    open: true,
+    // Open browser on start
+    open: false,
     
-    // HMR settings
+    // Hot module replacement
     hmr: {
-      // Heartbeat interval
-      heartbeat: 10000,
-      
-      // Timeout for connection
-      timeout: 30000,
-      
-      // Overlay errors in browser
-      overlay: true,
+      host: 'localhost',
+      protocol: 'ws',
+      port: undefined,
+      path: '/__vite_ws__',
     },
     
-    // Proxy settings for API requests
+    // Watch files changes
+    watch: {
+      usePolling: false,
+      interval: 1000,
+      binaryInterval: 1000,
+    },
+    
+    // Proxy configurations
     proxy: {},
     
-    // Hot reload optimization
-    watch: {
-      // Use polling for file watching
-      usePolling: false,
-      
-      // Interval for polling
-      interval: 1000,
-      
-      // Ignore certain files/directories
-      ignored: ['**/node_modules/**', '**/dist/**'],
-    },
+    // Strict port mode
+    strictPort: false,
     
     // CORS configuration
     cors: true,
     
-    // Strict port usage
-    strictPort: false,
-    
-    // Allow local network access
+    // Allowed origins
     allowedHosts: true,
     
-    // Security headers for dev server
+    // File watching options
+    fs: {
+      allow: ['..'],
+      strict: true,
+    },
+    
+    // WebSocket server
+    ws: {
+      host: 'localhost',
+    },
+    
+    // Header configuration
     headers: {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
   
-  // Optimization settings
+  // Preview server configuration
+  preview: {
+    // Host binding
+    host: '0.0.0.0',
+    
+    // Port
+    port: 3000,
+    
+    // Open browser on start
+    open: false,
+    
+    // Strict port mode
+    strictPort: false,
+    
+    // CORS configuration
+    cors: true,
+  },
+  
+  // Resolve aliases
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+      '#': resolve(__dirname, 'public'),
+    },
+  },
+  
+  // CSS preprocessor settings
+  css: {
+    // Preprocessor options
+    preprocessorOptions: {
+      scss: {
+        additionalData: '',
+        silenceDeprecations: [],
+      },
+      less: {
+        javascriptEnabled: true,
+      },
+      stylus: {},
+    },
+    
+    // PostCSS plugins
+    postcss: {
+      plugins: [],
+    },
+    
+    // Modules
+    modules: {
+      localsConvention: 'camelCase',
+      generateScopedName: '[name]__[local]___[hash:base64:5]',
+    },
+  },
+  
+  // Define global constants
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    __ENVIRONMENT__: JSON.stringify(process.env.NODE_ENV || 'development'),
+  },
+  
+  // Optimize dependencies
   optimizeDeps: {
     // Include dependencies to pre-bundle
     include: ['zod', 'canvas-confetti'],
     
-    // Exclude from pre-bundling
+    // Exclude dependencies
     exclude: [],
     
-    // Force re-bundle on changes
+    // Entries to pre-bundle
+    entries: [],
+    
+    // Force re-bundle when deps change
     force: false,
-  },
-  
-  // CSS processing
-  css: {
-    // Preprocessor options
-    preprocessorOptions: {},
     
-    // PostCSS plugins
-    postcss: {},
+    // Hold dependencies in memory
+    holdUntilCrawlEnd: true,
     
-    // Modules configuration
-    modules: {
-      // Generate class names
-      classNameStrategy: 'local',
+    // Depth of dependency discovery
+    depth: 10,
+    
+    // ESBuild options
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+      target: 'esnext',
+      supported: {
+        dynamicImport: true,
+      },
     },
   },
   
-  // Environment variables prefix
-  envPrefix: 'VITE_',
+  // Worker configuration
+  worker: {
+    format: 'es',
+    plugins: () => [],
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+  },
+  
+  // SSR configuration
+  ssr: {
+    // External packages
+    noExternal: [],
+    
+    // External patterns
+    external: [],
+    
+    // Dep optimization
+    optimizeDeps: {
+      include: [],
+      exclude: [],
+    },
+  },
+  
+  // Environment variables loading
+  envDir: '.',
+  envPrefix: ['VITE_', 'CARD_', 'GAME_'],
+  
+  // Experimental features
+  experimental: {
+    // Async import conditions
+    asyncContext: true,
+    
+    // Import meta glob
+    importMetaGlob: true,
+    
+    // Inline styles
+    inlineStylesCondition: '',
+    
+    // CSS imports
+    cssLazyCompilation: false,
+    
+    // Web assembly support
+    webAssembly: false,
+    
+    // Module preloading
+    modulePreload: {
+      polyfill: true,
+    },
+    
+    // Preserve symlinks
+    preserveSymlinks: false,
+  },
+  
+  // Custom plugin hooks
+  plugins: [],
+  
+  // Deps version check
+  logLevel: 'info',
+  
+  // Log file
+  logFile: '.vite/build.log',
+  
+  // Clear console on restart
+  clearScreen: true,
+  
+  // Force config reload
+  configFile: undefined,
+  
+  // Config file check
+  configFileCheck: true,
+  
+  // Cache directory
+  cacheDir: '.vite',
+  
+  // Timeouts
+  buildTimeout: 30000,
+  
+  // Deps timeout
+  depsCacheDir: '.vite/deps-cache',
 });
