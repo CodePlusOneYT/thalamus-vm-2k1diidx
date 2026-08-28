@@ -1,203 +1,144 @@
-import { Entity } from "./Entity";
-import type { CardVehicle } from "./CardVehicle";
-
-export interface CameraConfig {
-  smoothFollowSpeed?: number;     // 0-1, higher = faster following
-  minZoom?: number;                // Minimum zoom level
-  maxZoom?: number;                // Maximum zoom level
-  zoomSpeed?: number;              // How fast zoom changes
-  baseZoom?: number;               // Default zoom level
-  shakeIntensity?: number;         // Base shake intensity
-  shakeDecay?: number;             // How fast shake decays (per frame)
-  shakeMaxDuration?: number;       // Max shake duration in frames
-  roadMarginPercent?: number;      // Extra space around road (0-1)
-}
-
-interface ShakeEvent {
-  intensity: number;
-  duration: number;
-  elapsed: number;
-}
-
-export class Camera extends Entity {
-  private config: Required<CameraConfig>;
-  private target: Entity | null = null;
-  
-  // Current camera state
+/**
+ * Camera - Follows player with smooth movement, shake effects, and zoom
+ */
+export class Camera {
   private x: number = 0;
   private y: number = 0;
+  private targetX: number = 0;
+  private targetY: number = 0;
+  private shakeIntensity: number = 0;
+  private shakeDuration: number = 0;
+  private shakeTimer: number = 0;
   private zoom: number = 1;
   private targetZoom: number = 1;
-  
-  // Shake system
-  private shakeEvents: ShakeEvent[] = [];
-  private shakeX: number = 0;
-  private shakeY: number = 0;
+  private lerpSpeed: number = 0.1;
+  private width: number = 0;
+  private height: number = 0;
 
-  constructor(config: CameraConfig = {}) {
-    super(0, 0);
-    
-    this.config = {
-      smoothFollowSpeed: config.smoothFollowSpeed ?? 0.08,
-      minZoom: config.minZoom ?? 0.4,
-      maxZoom: config.maxZoom ?? 1.2,
-      zoomSpeed: config.zoomSpeed ?? 0.02,
-      baseZoom: config.baseZoom ?? 0.8,
-      shakeIntensity: config.shakeIntensity ?? 8,
-      shakeDecay: config.shakeDecay ?? 0.92,
-      shakeMaxDuration: config.shakeMaxDuration ?? 30,
-      roadMarginPercent: config.roadMarginPercent ?? 0.15,
-    };
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
   }
 
   /**
-   * Set the target entity to follow (usually the player vehicle)
+   * Update camera position based on player position
    */
-  setTarget(target: Entity | null): void {
-    this.target = target;
-  }
+  update(playerX: number, playerY: number, deltaTime: number): void {
+    // Smooth follow
+    this.targetX = playerX - this.width / 2;
+    this.targetY = playerY - this.height / 2;
 
-  /**
-   * Trigger screen shake effect
-   */
-  addShake(intensity: number, durationFrames: number = 15): void {
-    if (intensity <= 0 || durationFrames <= 0) return;
-    
-    this.shakeEvents.push({
-      intensity: Math.min(intensity, 50),
-      duration: durationFrames,
-      elapsed: 0,
-    });
-  }
+    // Apply lerp for smooth movement
+    const dx = this.targetX - this.x;
+    const dy = this.targetY - this.y;
+    this.x += dx * this.lerpSpeed;
+    this.y += dy * this.lerpSpeed;
 
-  /**
-   * Add multiple shake events (for cumulative effects like explosions)
-   */
-  addMultiShake(events: { intensity: number; duration: number }[]): void {
-    for (const event of events) {
-      this.addShake(event.intensity, event.duration);
-    }
-  }
+    // Zoom smoothing
+    this.zoom += (this.targetZoom - this.zoom) * this.lerpSpeed;
 
-  /**
-   * Update camera position and effects
-   */
-  update(deltaTime: number, width: number, height: number): void {
-    if (!this.target) return;
-
-    // Update zoom based on target speed (if vehicle)
-    const speed = 'getSpeed' in this.target ? this.target.getSpeed() : 0;
-    const targetZoom = this.calculateDynamicZoom(speed);
-    this.targetZoom = targetZoom;
-
-    // Smoothly interpolate zoom
-    const zoomDelta = this.targetZoom - this.zoom;
-    this.zoom += zoomDelta * this.config.zoomSpeed * deltaTime;
-    this.zoom = Math.max(this.config.minZoom, Math.min(this.config.maxZoom, this.zoom));
-
-    // Handle shake decay and application
-    this.updateShake(deltaTime, width, height);
-
-    // Follow target smoothly
-    const targetX = this.target.x;
-    const targetY = this.target.y;
-    
-    const dx = targetX - this.x;
-    const dy = targetY - this.y;
-    
-    this.x += dx * this.config.smoothFollowSpeed * deltaTime;
-    this.y += dy * this.config.smoothFollowSpeed * deltaTime;
-  }
-
-  /**
-   * Calculate zoom level based on vehicle speed
-   */
-  private calculateDynamicZoom(speed: number): number {
-    // Speed range: 0-150 (normalized 0-1)
-    const normalizedSpeed = Math.min(speed / 150, 1);
-    
-    // Interpolate between min and max zoom
-    const dynamicZoom = 
-      this.config.baseZoom + 
-      (this.config.maxZoom - this.config.baseZoom) * normalizedSpeed;
-    
-    return Math.max(this.config.minZoom, Math.min(this.config.maxZoom, dynamicZoom));
-  }
-
-  /**
-   * Update shake effects over time
-   */
-  private updateShake(deltaTime: number, width: number, height: number): void {
-    this.shakeX = 0;
-    this.shakeY = 0;
-
-    // Process active shake events
-    for (let i = this.shakeEvents.length - 1; i >= 0; i--) {
-      const event = this.shakeEvents[i];
-      event.elapsed++;
-
-      // Apply random shake offset
-      const progress = event.elapsed / event.duration;
-      const remaining = 1 - progress;
-      
-      // Stronger shake at start, easing out
-      const currentIntensity = event.intensity * remaining;
-      
-      if (currentIntensity > 0.1) {
-        // Generate random offset within intensity bounds
-        this.shakeX += (Math.random() - 0.5) * currentIntensity * 2;
-        this.shakeY += (Math.random() - 0.5) * currentIntensity * 2;
-      }
-
-      // Remove expired events
-      if (event.elapsed >= event.duration) {
-        this.shakeEvents.splice(i, 1);
+    // Shake effect
+    if (this.shakeDuration > 0) {
+      this.shakeTimer -= deltaTime;
+      if (this.shakeTimer <= 0) {
+        this.shakeDuration = 0;
+        this.shakeIntensity = 0;
+      } else {
+        const randomX = (Math.random() - 0.5) * this.shakeIntensity;
+        const randomY = (Math.random() - 0.5) * this.shakeIntensity;
+        this.x += randomX;
+        this.y += randomY;
       }
     }
-
-    // Apply decay factor to accumulated shake
-    this.shakeX *= this.config.shakeDecay;
-    this.shakeY *= this.config.shakeDecay;
   }
 
   /**
-   * Get current camera transform for rendering
+   * Apply screen shake effect
    */
-  getTransform(): { x: number; y: number; zoom: number; shakeX: number; shakeY: number } {
+  applyShake(intensity: number, duration: number): void {
+    this.shakeIntensity = intensity;
+    this.shakeDuration = duration;
+    this.shakeTimer = duration;
+  }
+
+  /**
+   * Set zoom level
+   */
+  setZoom(zoom: number): void {
+    this.targetZoom = Math.max(0.1, Math.min(3, zoom));
+  }
+
+  /**
+   * Get current camera bounds in world coordinates
+   */
+  getBounds(): { left: number; right: number; top: number; bottom: number } {
     return {
-      x: this.x + this.shakeX,
-      y: this.y + this.shakeY,
-      zoom: this.zoom,
-      shakeX: this.shakeX,
-      shakeY: this.shakeY,
+      left: this.x,
+      right: this.x + this.width / this.zoom,
+      top: this.y,
+      bottom: this.y + this.height / this.zoom
     };
   }
 
   /**
-   * Reset all shake effects immediately
+   * Transform world coordinates to screen coordinates
    */
-  resetShake(): void {
-    this.shakeEvents = [];
-    this.shakeX = 0;
-    this.shakeY = 0;
+  worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+    return {
+      x: (worldX - this.x) * this.zoom,
+      y: (worldY - this.y) * this.zoom
+    };
   }
 
   /**
-   * Get current shake intensity (useful for UI feedback)
+   * Transform screen coordinates to world coordinates
    */
-  getShakeIntensity(): number {
-    let totalIntensity = 0;
-    for (const event of this.shakeEvents) {
-      const progress = event.elapsed / event.duration;
-      totalIntensity += event.intensity * (1 - progress);
-    }
-    return totalIntensity;
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    return {
+      x: screenX / this.zoom + this.x,
+      y: screenY / this.zoom + this.y
+    };
   }
 
   /**
-   * Check if camera is currently shaking significantly
+   * Check if entity is within camera view
    */
-  isSignificantlyShaking(threshold: number = 2): boolean {
-    return this.getShakeIntensity() > threshold;
+  isVisible(entityX: number, entityY: number, entityWidth: number, entityHeight: number): boolean {
+    const bounds = this.getBounds();
+    const entityLeft = entityX - entityWidth / 2;
+    const entityRight = entityX + entityWidth / 2;
+    const entityTop = entityY - entityHeight / 2;
+    const entityBottom = entityY + entityHeight / 2;
+
+    return entityLeft < bounds.right &&
+           entityRight > bounds.left &&
+           entityTop < bounds.bottom &&
+           entityBottom > bounds.top;
+  }
+
+  /**
+   * Reset camera to default state
+   */
+  reset(): void {
+    this.x = 0;
+    this.y = 0;
+    this.targetX = 0;
+    this.targetY = 0;
+    this.shakeDuration = 0;
+    this.shakeIntensity = 0;
+    this.shakeTimer = 0;
+    this.targetZoom = 1;
+    this.zoom = 1;
+  }
+
+  /**
+   * Get current camera transform matrix values for rendering
+   */
+  getTransform(): { offsetX: number; offsetY: number; scale: number } {
+    return {
+      offsetX: -this.x,
+      offsetY: -this.y,
+      scale: this.zoom
+    };
   }
 }
