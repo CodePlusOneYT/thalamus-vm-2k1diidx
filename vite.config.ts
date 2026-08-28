@@ -52,67 +52,22 @@ export default defineConfig({
   // Output directory
   outDir: 'dist',
   
-  // Clean output directory before build
-  cleanDist: true,
+  // Clean output directory on build
+  cleanDir: true,
   
-  // Development server configuration
-  server: {
-    host: '0.0.0.0',
-    port: 3000,
-    strictPort: false,
-    open: false,
-    watch: {
-      usePolling: false,
-    },
-    cors: true,
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: undefined,
-      clientPort: undefined,
-    },
-  },
-  
-  // Build settings
+  // Sourcemap generation
   build: {
-    // Rollup options
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
-      output: {
-        // Chunking strategy
-        manualChunks,
-        
-        // Asset handling
-        assetFileNames: ({ name }) => {
-          if (name?.endsWith('.svg')) return 'assets/favicon/[name]-[hash].[ext]';
-          if (name?.endsWith('.png')) return 'assets/icons/[name]-[hash].[ext]';
-          return 'assets/[name]-[hash].[ext]';
-        },
-        
-        // JS chunks
-        entryFileNames: 'js/[name]-[hash].js',
-        chunkFileNames: 'js/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-      },
-    },
-    
-    // Target browsers
-    target: 'ES2022',
-    
-    // Minification
-    minify: 'terser',
-    
-    // Source maps for debugging
     sourcemap: true,
     
-    // Terser options for better compression
+    // Minification with terser
+    minify: 'terser',
+    
+    // Terser compression options
     terserOptions: {
       compress: {
-        drop_console: process.env.NODE_ENV === 'production',
-        drop_debugger: process.env.NODE_ENV === 'production',
-        pure_funcs: ['console.log', 'console.info'],
+        drop_console: false,
+        drop_debugger: false,
+        pure_funcs: [],
       },
       mangle: true,
       format: {
@@ -120,41 +75,124 @@ export default defineConfig({
       },
     },
     
-    // Generate source map
-    generateSourceMaps: true,
+    // Chunking strategy
+    rollupOptions: {
+      input: './index.html',
+      output: {
+        // Named chunks for better caching
+        chunkFileNames: 'assets/chunks/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+      
+      // Manual chunking
+      preserveEntrySignatures: 'allow-extension',
+    },
     
-    // Optimize bundle size
-    chunkSizeWarningLimit: 500,
+    // Target browsers
+    target: 'es2022',
+    
+    // Assets inline threshold (base64 for small files)
+    assetsInlineLimit: 1000,
+    
+    // Code splitting
+    splitChunks: true,
+    
+    // Rollup plugins integration
     reportCompressedSize: true,
+    bundleStats: true,
   },
   
-  // CSS settings
-  css: {
-    preprocessorOptions: {
-      scss: {},
+  // Development server configuration
+  server: {
+    // Port
+    port: 3000,
+    
+    // Host binding
+    host: '0.0.0.0',
+    
+    // Open browser automatically
+    open: true,
+    
+    // Hot module replacement
+    hmr: {
+      overlay: true,
+      clientPort: 3000,
     },
+    
+    // Watch options
+    watch: {
+      usePolling: false,
+      interval: 100,
+      deepWatch: true,
+    },
+    
+    // Proxy configuration (if needed)
+    proxy: {},
+    
+    // Strict port mode
+    strictPort: true,
+    
+    // Cors headers
+    cors: true,
+  },
+  
+  // CSS configuration
+  css: {
+    // Preprocessor options
+    preprocessorOptions: {
+      scss: {
+        additionalData: '',
+      },
+      less: {
+        additionalData: '',
+      },
+      stylus: {
+        additionalData: '',
+      },
+    },
+    
+    // PostCSS plugins
+    postcss: {
+      plugins: [],
+    },
+    
+    // Modules localIdentName
     modules: {
-      generateScopedName: '[name]_[local]_[hash:base64:5]',
+      generateScopedName: '[local]--[hash:base64:5]',
     },
   },
   
   // Resolve aliases
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(__dirname, './src'),
+      '@engine': resolve(__dirname, './src/engine'),
+      '@physics': resolve(__dirname, './src/physics'),
+      '@entities': resolve(__dirname, './src/entities'),
+      '@audio': resolve(__dirname, './src/audio'),
+      '@systems': resolve(__dirname, './src/systems'),
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
   // Define global constants
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    '__APP_VERSION__': JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0.0'),
+    'import.meta.env.VITE_APP_NAME': JSON.stringify('Card Drive & Drift'),
   },
   
-  // Optimizations
+  // Preview server configuration
+  preview: {
+    port: 3000,
+    host: '0.0.0.0',
+    open: false,
+  },
+  
+  // Optimize dependencies
   optimizeDeps: {
     include: ['zod', 'canvas-confetti'],
     exclude: [],
+    force: false,
   },
 });
