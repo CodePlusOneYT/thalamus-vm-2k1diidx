@@ -11,7 +11,7 @@ import { resolve } from 'path';
 
 // Manual chunking strategy: separate vendor dependencies from game modules
 const manualChunks = {
-  // External libraries that rarely change and can be cached separately
+  // External libraries that rarely change
   vendor: ['zod', 'canvas-confetti'],
   
   // Engine core - handles game loop, input, entities, scenes
@@ -86,144 +86,158 @@ export default defineConfig({
       },
     },
     
-    // Generate source maps for debugging
+    // Source map generation for source-level debugging
     sourcemap: true,
     
-    // Rollup options for code splitting
+    // Chunk size warning threshold in KB
+    chunkSizeWarningLimit: 1000,
+    
+    // Rollup options
     rollupOptions: {
-      // Input entry point
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
-      
-      // Output configuration
+      // Manual chunking configuration
       output: {
-        // Asset naming pattern
+        // Manual chunks for better code splitting
+        manualChunks,
+        
+        // Asset filename pattern
         assetFileNames: ({ name }) => {
-          const extType = name?.split('.').at(1);
-          if (/\.(png|jpe?g|gif|svg|webp)$/i.test(String(name))) {
-            return `assets/images/[name]-[hash][extname]`;
-          }
-          if (/\.(woff2?|ttf|otf|eot)$/i.test(String(name))) {
-            return `assets/fonts/[name]-[hash][extname]`;
-          }
-          if (/\.(mp3|wav|ogg)$/i.test(String(name))) {
-            return `assets/audio/[name]-[hash][extname]`;
-          }
-          return `assets/[name]-[hash][extname]`;
+          if (name && name.endsWith('.png')) return 'assets/images/[name]-[hash][extname]';
+          if (name && name.endsWith('.svg')) return 'assets/icons/[name]-[hash][extname]';
+          if (name && name.endsWith('.json')) return 'assets/data/[name]-[hash][extname]';
+          return 'assets/[name]-[hash][extname]';
         },
         
-        // Chunk naming pattern
-        entryFileNames: 'js/[name]-[hash].js',
-        chunkFileNames: 'js/chunks/[name]-[hash].js',
-        cssFileNames: 'css/[name]-[hash].css',
-        
-        // Manual chunks configuration
-        manualChunks,
+        // Entry point configuration
+        entryFileNames: '[name]-[hash].js',
+        chunkFileNames: '[name]-[hash].js',
+        // CSS output
+        cssChunkFileNames: '[name]-[hash].css',
       },
       
+      // Input files
+      input: resolve(__dirname, 'index.html'),
+      
       // Preserve module structure
-      preserveEntrySignatures: 'exports-only',
+      preserveEntrySignatures: 'allow-extension',
     },
     
-    // Code size reporting
-    reportCompressedSize: true,
+    // Code split by route (not used here but good practice)
+    codeSplitting: true,
     
-    // Chunk size warning threshold (in kB)
-    chunkSizeWarningLimit: 500,
-    
-    // CSS code splitting
-    cssCodeSplit: true,
-    
-    // Empty outDir before build
-    emptyOutDir: true,
+    // Inline dynamic imports as small as possible
+    inlineDynamicImports: false,
   },
   
   // Development server configuration
   server: {
-    // Host binding (accessible from network)
+    // Host binding (0.0.0.0 allows network access)
     host: '0.0.0.0',
     
     // Development server port
     port: 3000,
     
-    // Open browser automatically
+    // Auto-open browser on start
     open: true,
     
-    // Force HTTPS in development
-    https: false,
-    
-    // Proxy configuration for API requests
+    // Proxy configuration for API endpoints
     proxy: {},
     
-    // File watching options
+    // Hot Module Replacement (HMR)
+    hmr: {
+      enabled: true,
+      host: 'localhost',
+      protocol: 'ws',
+    },
+    
+    // Watch options for file changes
     watch: {
       usePolling: false,
       interval: 100,
-      ignored: ['**/node_modules/**', '**/dist/**'],
+      ignore: ['node_modules/**', 'dist/**'],
     },
     
-    // Server headers
-    headers: {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block',
-    },
+    // CORS headers
+    cors: true,
+    
+    // Strict content security policy
+    strictPort: false,
   },
   
-  // Optimization settings
-  optimizeDeps: {
-    // Include dependencies to pre-bundle
-    include: ['zod', 'canvas-confetti'],
+  // Preview server configuration
+  preview: {
+    // Preview server port
+    port: 3000,
     
-    // Exclude large dependencies
-    exclude: [],
+    // Host binding
+    host: '0.0.0.0',
     
-    // Force re-bundle on deps change
-    force: false,
-  },
-  
-  // Preload settings
-  preload: {
-    // Enable preloading
-    enabled: true,
-    
-    // Preload strategies
-    crossOrigin: 'anonymous',
-  },
-  
-  // CSS processing
-  css: {
-    // CSS modules configuration
-    modules: {
-      localsConvention: 'camelCaseOnly',
-      generateScopedName: '[name]-[local]-[hash:base64:8]',
-    },
-    
-    // PostCSS plugins
-    postcss: {
-      plugins: [],
-    },
+    // Open browser automatically
+    open: true,
   },
   
   // Define global constants
   define: {
-    // Application version
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0.0'),
-    
     // Environment detection
-    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
-    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV === 'development'),
+    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+    __VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
   },
   
-  // Resolve aliases
+  // Optimize dependencies pre-bundling
+  optimizeDeps: {
+    // Dependencies to include in pre-bundle
+    include: ['zod', 'canvas-confetti'],
+    
+    // Exclude unnecessary packages
+    exclude: [],
+    
+    // Force re-bundle on dependency change
+    force: false,
+  },
+  
+  // Resolve module aliases
   resolve: {
+    // Alias configuration
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@engine': resolve(__dirname, 'src/engine'),
+      '@physics': resolve(__dirname, 'src/physics'),
+      '@entities': resolve(__dirname, 'src/entities'),
+      '@audio': resolve(__dirname, 'src/audio'),
+      '@systems': resolve(__dirname, 'src/systems'),
     },
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+    
+    // Extensions to resolve implicitly
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.json'],
+    
+    // Conditions for package exports
+    mainFields: ['browser', 'module', 'main'],
   },
   
-  // Plugin configuration space (for future plugins)
-  plugins: [],
+  // CSS configuration
+  css: {
+    // Preprocessor options
+    preprocessorOptions: {},
+    
+    // PostCSS plugins
+    postcss: {},
+    
+    // Modules configuration
+    modules: {
+      localsConvention: 'camelCaseOnly',
+    },
+  },
+  
+  // Assets configuration
+  assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg'],
+  
+  // Log level (silent, info, warn, error, verbose)
+  logLevel: 'info',
+  
+  // Custom logger
+  customLogger: undefined,
+  
+  // SSR configuration (not using SSR for this game)
+  ssr: {
+    noExternal: [],
+  },
 });
