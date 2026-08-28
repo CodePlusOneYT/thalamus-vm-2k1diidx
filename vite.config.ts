@@ -52,21 +52,40 @@ export default defineConfig({
   // Output directory
   outDir: 'dist',
   
-  // Clean output directory on build
-  cleanDir: true,
+  // Clean output directory before build
+  cleanDist: true,
   
-  // Sourcemap generation
+  // Build settings
   build: {
-    sourcemap: true,
+    // Rollup options
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
+      output: {
+        // Chunking strategy
+        manualChunks,
+        
+        // Asset handling
+        assetFileName: () => '[name]-[hash][extname]',
+        
+        // Chunk naming
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        
+        // Entry point naming
+        entryFileNames: 'entry-[name]-[hash].js',
+        
+        // Inline chunk size threshold
+        inlineDynamicImports: false,
+      },
+    },
     
-    // Minification with terser
+    // Minification settings
     minify: 'terser',
-    
-    // Terser compression options
     terserOptions: {
       compress: {
-        drop_console: false,
-        drop_debugger: false,
+        drop_console: true,
+        drop_debugger: true,
         pure_funcs: [],
       },
       mangle: true,
@@ -75,124 +94,77 @@ export default defineConfig({
       },
     },
     
-    // Chunking strategy
-    rollupOptions: {
-      input: './index.html',
-      output: {
-        // Named chunks for better caching
-        chunkFileNames: 'assets/chunks/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-      },
-      
-      // Manual chunking
-      preserveEntrySignatures: 'allow-extension',
-    },
+    // Source map generation
+    sourcemap: true,
     
-    // Target browsers
-    target: 'es2022',
+    // Target browser compatibility
+    target: 'ES2022',
     
-    // Assets inline threshold (base64 for small files)
-    assetsInlineLimit: 1000,
-    
-    // Code splitting
-    splitChunks: true,
-    
-    // Rollup plugins integration
-    reportCompressedSize: true,
-    bundleStats: true,
+    // Assets inlining
+    assetsInlineLimit: 4096,
   },
   
-  // Development server configuration
+  // Development server settings
   server: {
-    // Port
+    // Port configuration
     port: 3000,
     
-    // Host binding
+    // Host binding (allows external access)
     host: '0.0.0.0',
     
-    // Open browser automatically
-    open: true,
-    
-    // Hot module replacement
+    // Enable hot module replacement
     hmr: {
+      enabled: true,
       overlay: true,
-      clientPort: 3000,
     },
     
-    // Watch options
+    // Watch changes
     watch: {
       usePolling: false,
       interval: 100,
-      deepWatch: true,
     },
     
-    // Proxy configuration (if needed)
-    proxy: {},
-    
-    // Strict port mode
-    strictPort: true,
-    
-    // Cors headers
+    // CORS headers
     cors: true,
+    
+    // Strict port usage
+    strictPort: false,
   },
   
-  // CSS configuration
+  // CSS settings
   css: {
     // Preprocessor options
-    preprocessorOptions: {
-      scss: {
-        additionalData: '',
-      },
-      less: {
-        additionalData: '',
-      },
-      stylus: {
-        additionalData: '',
-      },
-    },
+    preprocessorOptions: {},
     
-    // PostCSS plugins
-    postcss: {
-      plugins: [],
-    },
-    
-    // Modules localIdentName
-    modules: {
-      generateScopedName: '[local]--[hash:base64:5]',
+    // Dynamic imports
+    dynamicImportVars: {
+      warnOnError: true,
+      exclude: [],
     },
   },
   
   // Resolve aliases
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
-      '@engine': resolve(__dirname, './src/engine'),
-      '@physics': resolve(__dirname, './src/physics'),
-      '@entities': resolve(__dirname, './src/entities'),
-      '@audio': resolve(__dirname, './src/audio'),
-      '@systems': resolve(__dirname, './src/systems'),
+      '@': resolve(__dirname, 'src'),
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
-  // Define global constants
+  // Define environment variables
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0.0'),
-    'import.meta.env.VITE_APP_NAME': JSON.stringify('Card Drive & Drift'),
+    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV === 'development'),
+    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
+    'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV || 'development'),
   },
   
-  // Preview server configuration
-  preview: {
-    port: 3000,
-    host: '0.0.0.0',
-    open: false,
-  },
-  
-  // Optimize dependencies
+  // Optimizations
   optimizeDeps: {
     include: ['zod', 'canvas-confetti'],
     exclude: [],
     force: false,
   },
+  
+  // Log level
+  logLevel: 'info',
 });
