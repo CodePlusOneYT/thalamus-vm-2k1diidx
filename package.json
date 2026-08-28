@@ -16,11 +16,11 @@
     "lint:fix": "eslint src/**/*.{ts,tsx,js,jsx} --fix",
     "format": "prettier --write src/**/*.{ts,tsx,js,jsx,json,css,md}",
     "clean": "rm -rf dist node_modules",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky install"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@types/dom": "^0.0.1"
+    "@types/dom": "^0.0.1",
+    "canvas-confetti": "^1.9.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.8",
@@ -34,57 +34,12 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.36.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
-    "husky": "^9.1.4",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "lint-staged": "^15.2.9",
     "prettier": "^3.3.3",
     "typescript": "^5.6.2",
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "game",
-    "racing",
-    "physics",
-    "drift",
-    "vite",
-    "typescript",
-    "canvas"
-  ],
-  "author": "Card Drive Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "bugs": {
-    "url": ""
-  },
-  "homepage": "",
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,css,md}": [
-      "prettier --write"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.5%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
   }
 }
