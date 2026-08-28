@@ -86,158 +86,106 @@ export default defineConfig({
       },
     },
     
-    // Source map generation for source-level debugging
+    // Sourcemap generation for both dev and build
     sourcemap: true,
     
-    // Chunk size warning threshold in KB
-    chunkSizeWarningLimit: 1000,
+    // Code splitting threshold
+    chunkSizeWarningLimit: 500,
     
-    // Rollup options
+    // Rollup rollupOptions for chunking
     rollupOptions: {
-      // Manual chunking configuration
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
       output: {
-        // Manual chunks for better code splitting
-        manualChunks,
+        // Chunking strategy
+        manualChunks: manualChunks,
         
         // Asset filename pattern
-        assetFileNames: ({ name }) => {
-          if (name && name.endsWith('.png')) return 'assets/images/[name]-[hash][extname]';
-          if (name && name.endsWith('.svg')) return 'assets/icons/[name]-[hash][extname]';
-          if (name && name.endsWith('.json')) return 'assets/data/[name]-[hash][extname]';
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name && assetInfo.name.endsWith('.svg')) {
+            return 'assets/icons/[name][extname]';
+          }
           return 'assets/[name]-[hash][extname]';
         },
         
-        // Entry point configuration
-        entryFileNames: '[name]-[hash].js',
-        chunkFileNames: '[name]-[hash].js',
-        // CSS output
-        cssChunkFileNames: '[name]-[hash].css',
+        // JS filename pattern
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        
+        // Chunk filename pattern
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        
+        // CSS filename pattern
+        assetDirs: 'assets',
       },
-      
-      // Input files
-      input: resolve(__dirname, 'index.html'),
-      
-      // Preserve module structure
-      preserveEntrySignatures: 'allow-extension',
     },
-    
-    // Code split by route (not used here but good practice)
-    codeSplitting: true,
-    
-    // Inline dynamic imports as small as possible
-    inlineDynamicImports: false,
   },
   
-  // Development server configuration
+  // Development server settings
   server: {
-    // Host binding (0.0.0.0 allows network access)
+    // Host binding for network access
     host: '0.0.0.0',
     
-    // Development server port
+    // Dev server port
     port: 3000,
     
-    // Auto-open browser on start
-    open: true,
+    // Force reload on changes
+    force: true,
     
-    // Proxy configuration for API endpoints
-    proxy: {},
-    
-    // Hot Module Replacement (HMR)
-    hmr: {
-      enabled: true,
-      host: 'localhost',
-      protocol: 'ws',
-    },
-    
-    // Watch options for file changes
+    // Watch files for reload
     watch: {
       usePolling: false,
       interval: 100,
-      ignore: ['node_modules/**', 'dist/**'],
     },
+    
+    // Open browser automatically
+    open: false,
+    
+    // Proxy settings for API calls
+    proxy: {},
     
     // CORS headers
     cors: true,
-    
-    // Strict content security policy
-    strictPort: false,
   },
   
-  // Preview server configuration
+  // Preview server settings
   preview: {
-    // Preview server port
-    port: 3000,
-    
-    // Host binding
     host: '0.0.0.0',
-    
-    // Open browser automatically
-    open: true,
-  },
-  
-  // Define global constants
-  define: {
-    // Environment detection
-    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
-    __VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    port: 4173,
+    open: false,
   },
   
   // Optimize dependencies pre-bundling
   optimizeDeps: {
-    // Dependencies to include in pre-bundle
     include: ['zod', 'canvas-confetti'],
-    
-    // Exclude unnecessary packages
     exclude: [],
-    
-    // Force re-bundle on dependency change
-    force: false,
+    entries: ['./src/main.ts'],
   },
   
-  // Resolve module aliases
+  // Resolve aliases
   resolve: {
-    // Alias configuration
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@engine': resolve(__dirname, 'src/engine'),
-      '@physics': resolve(__dirname, 'src/physics'),
-      '@entities': resolve(__dirname, 'src/entities'),
-      '@audio': resolve(__dirname, 'src/audio'),
-      '@systems': resolve(__dirname, 'src/systems'),
+      '@': resolve(__dirname, './src'),
     },
-    
-    // Extensions to resolve implicitly
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.json'],
-    
-    // Conditions for package exports
-    mainFields: ['browser', 'module', 'main'],
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   
-  // CSS configuration
+  // CSS settings
   css: {
-    // Preprocessor options
-    preprocessorOptions: {},
-    
-    // PostCSS plugins
-    postcss: {},
-    
-    // Modules configuration
     modules: {
       localsConvention: 'camelCaseOnly',
+      scopeBehaviour: 'local',
     },
   },
   
-  // Assets configuration
-  assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg'],
+  // Define global constants
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+  },
   
-  // Log level (silent, info, warn, error, verbose)
+  // Log level
   logLevel: 'info',
   
-  // Custom logger
-  customLogger: undefined,
-  
-  // SSR configuration (not using SSR for this game)
-  ssr: {
-    noExternal: [],
-  },
+  // Clear console on rerun
+  clearScreen: true,
 });
