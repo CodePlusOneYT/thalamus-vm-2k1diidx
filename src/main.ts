@@ -65,35 +65,28 @@ class CardDriveDrift {
 
   private render(): void {
     this.renderer.clear();
-    this.entityMgr.render(this.renderer.getCanvasContext());
-    this.sceneMgr.render(this.renderer.getCanvasContext());
+    this.sceneMgr.render();
   }
 
   private handleInput(): void {
     this.input.update();
+    this.entityMgr.handleInput(this.input);
   }
 
   private onResize(): void {
     const canvas = this.renderer.getCanvas();
-    const container = canvas.parentElement;
-    
-    if (container) {
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      
-      // Update viewport
-      this.renderer.setViewport(canvas.width, canvas.height);
-    }
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    this.engine.resize(canvas.width, canvas.height);
+    this.sceneMgr.onResize(canvas.width, canvas.height);
   }
 }
 
-// Entry point
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    const game = new CardDriveDrift();
-    window.__cardDriveDrift = game;
-    console.log('[CardDriveDrift] Game initialized successfully');
-  } catch (error) {
-    console.error('[CardDriveDrift] Failed to initialize:', error);
-  }
-});
+// Initialize game when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.__cardDriveDrift = new CardDriveDrift();
+  });
+} else {
+  window.__cardDriveDrift = new CardDriveDrift();
+}
